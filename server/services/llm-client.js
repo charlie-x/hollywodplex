@@ -282,7 +282,15 @@ async function askOpenAI(system, prompt, schema, maxTokens) {
   const content = choice?.message?.content;
   const finishReason = choice?.finish_reason || null;
   if (finishReason === 'length') {
-    console.warn('[llm] generation hit the token budget — raise OPENAI_MAX_TOKENS in .env if shelves come out short');
+    const used = res.data.usage?.completion_tokens;
+    if (used && used < budget * 0.9) {
+      // the server clamped the request below what we asked for —
+      // raising the client budget cannot help
+      console.warn(`[llm] generation stopped at ${used} tokens despite a ${budget}-token budget — `
+        + 'the server capped it; raise the server\'s context length');
+    } else {
+      console.warn('[llm] generation hit the token budget — raise OPENAI_MAX_TOKENS in .env if shelves come out short');
+    }
   }
   if (!content) {
     throw new Error(choice?.message?.reasoning_content
