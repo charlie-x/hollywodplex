@@ -17,7 +17,7 @@ const SIEGE_MIN = 60;          // how long the fog sits at full thickness
 const SIEGE_MAX = 90;
 const ROLL_IN = 15;
 const ROLL_OUT = 20;
-const MAX_CRACKS = 7;
+const MAX_CRACKS = 14;
 
 export function createWeatherEvent(scene, dims, opts = {}) {
   const cx = dims.cx ?? 0;
@@ -108,16 +108,14 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       thumped: false,
       ...overrides,
     };
-    // charges are made by the smaller things. the tall one is rare,
-    // slow, distant and faint — the less it shows, the bigger it feels
-    const texIdx = pass.charge
-      ? Math.floor(Math.random() * 2)
-      : (Math.random() < 0.15 ? 2 : Math.floor(Math.random() * 2));
+    // charges are made by the tentacle. the tall one is rare, slow,
+    // distant and faint — the less it shows, the bigger it feels
+    const texIdx = pass.charge ? 0 : (Math.random() < 0.15 ? 1 : 0);
     shape.material.map = shapeTexs[texIdx];
     shape.material.needsUpdate = true;
     pass.dim = 1;
     pass.stretchY = 1;
-    if (texIdx === 2) {
+    if (texIdx === 1) {
       // stretched skyward so only legs cross the view, kept well out
       // in the murk, taking its time
       pass.stretchY = 1.9;
@@ -379,7 +377,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     state = 'rollIn';
     timer = ROLL_IN;
     siegeLeft = SIEGE_MIN + Math.random() * (SIEGE_MAX - SIEGE_MIN);
-    thumpIn = 6 + Math.random() * 6;
+    thumpIn = 2 + Math.random() * 3;
     siegeT = 0;
     // the car is always taken — it is the centrepiece of the visit
     grabPlanned = cars.length > 0;
@@ -475,10 +473,10 @@ export function createWeatherEvent(scene, dims, opts = {}) {
         applyFog(); // keeps the breathing going at full thickness
         if (thumpIn <= 0) {
           scheduleStrike();
-          // sometimes they come in flurries, two or three in seconds
-          thumpIn = Math.random() < 0.35
-            ? 0.6 + Math.random() * 1.2
-            : 5 + Math.random() * 7;
+          // they come thick and fast, often in flurries
+          thumpIn = Math.random() < 0.5
+            ? 0.4 + Math.random() * 0.9
+            : 2.5 + Math.random() * 4;
         }
         if (grabPlanned && !grab && siegeT >= grabAt) beginGrab();
         if (!pass && Math.random() < dt * 0.08) startPass();

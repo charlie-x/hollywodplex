@@ -59,13 +59,12 @@ export function softFogTexture() {
 }
 
 /*
- * three vague silhouettes, never clearly seen: a shapeless hulking
- * mass, a single sweeping tentacle, and something far too tall —
- * only its legs pass through the frame. nothing here has an outline
- * clean enough to name, which is what keeps it unsettling.
+ * two vague silhouettes, never clearly seen: a single sweeping
+ * tentacle, and something far too tall — only its legs pass through
+ * the frame. nothing here has an outline clean enough to name.
  */
 export function creatureTextures() {
-  return [hulk(), tentacle(), stilts()];
+  return [tentacle(), stilts()];
 }
 
 function shapeCanvas() {
@@ -75,43 +74,6 @@ function shapeCanvas() {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, 256, 160);
   return { canvas, ctx };
-}
-
-function hulk() {
-  const { canvas, ctx } = shapeCanvas();
-  // blurred, so the boundary never quite resolves out of the fog
-  ctx.filter = 'blur(3px)';
-  ctx.fillStyle = 'rgba(0,0,0,0.85)';
-  // an asymmetric pile of overlapping lumps, heavier on one side —
-  // deliberately nothing like an animal outline
-  const lumps = [
-    [104, 92, 56, 40, 0.3],
-    [152, 78, 46, 34, -0.4],
-    [70, 108, 34, 26, 0.1],
-    [178, 104, 30, 22, 0.5],
-    [126, 118, 44, 28, -0.2],
-    [92, 66, 30, 24, 0.6],
-  ];
-  for (const [x, y, rx, ry, rot] of lumps) {
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // two tapering hints of appendage at odd angles, nothing paired
-  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 15;
-  ctx.beginPath();
-  ctx.moveTo(84, 122);
-  ctx.quadraticCurveTo(52, 142, 28, 148);
-  ctx.stroke();
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(176, 116);
-  ctx.quadraticCurveTo(206, 136, 226, 130);
-  ctx.stroke();
-  ctx.filter = 'none';
-  return new THREE.CanvasTexture(canvas);
 }
 
 function tentacle() {
