@@ -136,6 +136,12 @@ walk with wasd (shift to walk slowly, space to run), look with the
 mouse, click a case to open its details, press e for the search
 terminal, m to mute the ambience, and escape to release the mouse.
 
+gamepads work too (including edge on xbox consoles): left stick
+walks, right stick looks, a selects the case under the crosshair,
+b backs out, y opens search, right trigger or l3 runs, and menu
+mutes. the pad wakes the controls on first input — no pointer lock
+needed.
+
 ## fixing unmatched files
 
 files the server's metadata agent could not identify show their

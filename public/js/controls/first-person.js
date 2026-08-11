@@ -19,6 +19,8 @@ export class FirstPersonControls {
 
     // input state
     this.keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
+    // analogue input fed by the gamepad module each frame
+    this.pad = { forward: 0, right: 0, lookX: 0, lookY: 0, run: false };
     this.velocity = new THREE.Vector3();
     this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
@@ -40,8 +42,9 @@ export class FirstPersonControls {
 
   disable() {
     document.removeEventListener('mousemove', this._onMouseMove);
-    // reset keys so player stops moving
+    // reset inputs so player stops moving
     this.keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
+    this.pad = { forward: 0, right: 0, lookX: 0, lookY: 0, run: false };
     this.velocity.set(0, 0, 0);
   }
 
@@ -57,12 +60,23 @@ export class FirstPersonControls {
    * called each frame. applies input to camera position with collision resolution.
    */
   update(dt) {
-    if (!store.isPointerLocked) return;
+    if (!store.isPointerLocked && !store.gamepadActive) return;
 
-    // ---- mouse look (handled by _onMouseMove) ----
+    // ---- look: mouse via _onMouseMove, stick via accumulated deltas ----
+    if (this.pad.lookX !== 0 || this.pad.lookY !== 0) {
+      this.euler.setFromQuaternion(this.camera.quaternion);
+      this.euler.y -= this.pad.lookX;
+      this.euler.x -= this.pad.lookY;
+      this.euler.x = clamp(this.euler.x, -MAX_PITCH, MAX_PITCH);
+      this.camera.quaternion.setFromEuler(this.euler);
+      this.pad.lookX = 0;
+      this.pad.lookY = 0;
+    }
 
     // ---- movement ----
-    const speed = this.keys.space ? RUN_SPEED : (this.keys.shift ? WALK_SPEED * 0.5 : WALK_SPEED);
+    const speed = (this.keys.space || this.pad.run)
+      ? RUN_SPEED
+      : (this.keys.shift ? WALK_SPEED * 0.5 : WALK_SPEED);
 
     // compute movement direction from camera
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
@@ -80,7 +94,11 @@ export class FirstPersonControls {
     if (this.keys.d) moveDir.add(right);
     if (this.keys.a) moveDir.sub(right);
 
-    if (moveDir.lengthSq() > 0) {
+    // analogue stick input, preserving sub-full deflection for slow walks
+    moveDir.addScaledVector(forward, this.pad.forward);
+    moveDir.addScaledVector(right, this.pad.right);
+
+    if (moveDir.lengthSq() > 1) {
       moveDir.normalize();
     }
 

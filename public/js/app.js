@@ -17,6 +17,7 @@ import { createPromoDisplays } from './scene/promo.js';
 import { createDustParticles } from './scene/effects.js';
 import { FirstPersonControls } from './controls/first-person.js';
 import { setupPointerLock } from './controls/pointer-lock.js';
+import { createGamepadControls } from './controls/gamepad.js';
 import { CaseRaycaster } from './controls/raycaster.js';
 import * as THREE from 'three';
 import { ImageLoader } from './api/image-loader.js';
@@ -322,6 +323,12 @@ async function main() {
     ...(backRoom ? backRoom.collisionBoxes : []),
   ]);
 
+  // controller support: left stick walks, right stick looks, a selects
+  const gamepad = createGamepadControls(controls, canvas);
+  store.on('gamepad-active', () => hud.showMessage(
+    'controller: left stick walk, right stick look, a select, b back, y search', 6000,
+  ));
+
   // ambient store audio — starts on the first pointer lock gesture
   const audio = createStoreAudio();
   store.on('audio-muted', (m) => hud.showMessage(m ? 'audio muted' : 'audio on', 2000));
@@ -402,6 +409,7 @@ async function main() {
 
   // ---- animation loop ----
   sceneManager.onAnimate((dt) => {
+    gamepad.update(dt);
     controls.update(dt);
     const playerPos = controls.getPosition();
 
