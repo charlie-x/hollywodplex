@@ -80,9 +80,18 @@ export function createTasteScanner(scene, position) {
   let scanT = -1;
   let onDoneCb = null;
   let pulse = 0;
+  let available = true;
   let follow = null; // live position reference — the beam tracks the viewer
   const target = new THREE.Vector3();
   const emitter = new THREE.Vector3();
+
+  // while a test is running the button goes cold steel: no red, no
+  // pulse — it only breathes red again when it can be pressed
+  function setAvailable(v) {
+    available = v;
+    buttonMat.color.set(v ? '#d42027' : '#5a5f66');
+    buttonMat.emissive.set(v ? '#ff2233' : '#8a929c');
+  }
 
   function playScan(playerPos, onDone) {
     if (scanT >= 0) return;
@@ -97,11 +106,15 @@ export function createTasteScanner(scene, position) {
 
   function update(dt) {
     pulse += dt;
-    // slow breathe: smoothstep the sine so the glow eases in and out
-    // with a gentle dwell at both the bright and dim ends
-    const breathe = 0.5 + 0.5 * Math.sin(pulse * 1.4);
-    const eased = breathe * breathe * (3 - 2 * breathe);
-    buttonMat.emissiveIntensity = 0.2 + 0.9 * eased;
+    if (available) {
+      // slow breathe: smoothstep the sine so the glow eases in and out
+      // with a gentle dwell at both the bright and dim ends
+      const breathe = 0.5 + 0.5 * Math.sin(pulse * 1.4);
+      const eased = breathe * breathe * (3 - 2 * breathe);
+      buttonMat.emissiveIntensity = 0.2 + 0.9 * eased;
+    } else {
+      buttonMat.emissiveIntensity = 0.18; // flat, waiting
+    }
 
     if (scanT < 0) return;
     scanT += dt;
@@ -148,7 +161,7 @@ export function createTasteScanner(scene, position) {
     }
   }
 
-  return { group, buttonMesh: group, playScan, update };
+  return { group, buttonMesh: group, playScan, update, setAvailable };
 }
 
 function labelTexture() {

@@ -361,6 +361,7 @@ async function main() {
   store.on('taste-scan', async () => {
     if (!scanner || rescanInFlight) return;
     rescanInFlight = true;
+    scanner.setAvailable(false);
     hud.showMessage('voight-rewind test initiated — hold still and think about movies', 2800);
     scanner.playScan(controls.getPosition(), () => {
       hud.showMessage('interlinked. profile captured — the film buff is deliberating...', 5000);
@@ -389,6 +390,7 @@ async function main() {
       hud.showMessage('the voight-rewind machine jammed — try again later', 4000);
     } finally {
       rescanInFlight = false;
+      scanner.setAvailable(true);
     }
   });
 
