@@ -21,9 +21,13 @@ state synced back to your server, tv season and episode browsing,
 trailers, a poster picker and a fix-match tool for files your server
 never identified.
 
-with an anthropic api key configured it also stocks llm-curated
-shelves (recommendations, a seasonal shelf, date night picks and a
-cult classics aisle), refreshed every few days and cached on disk.
+with an llm backend configured (anthropic, ollama, or any
+openai-compatible server) it also stocks llm-curated shelves
+(recommendations, a seasonal shelf, date night picks and a cult
+classics aisle), refreshed every few days and cached on disk. in the
+store itself, the voight-rewind machine beside the recommended rack
+scans you for a fresh batch of picks, and a zoltar machine by the
+front wall dispenses a movie fortune at the press of a button.
 
 ## requirements
 
@@ -201,8 +205,8 @@ other hosts and never reaches the browser.
 
 ## credits
 
-jellyfin support was contributed by
-[icelaglace](https://github.com/icelaglace).
+jellyfin support and the openai-compatible llm backend were
+contributed by [icelaglace](https://github.com/icelaglace).
 
 
 
