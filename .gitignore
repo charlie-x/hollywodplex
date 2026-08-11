@@ -1,0 +1,29 @@
+# secrets — .env holds the plex token (keep .env.example tracked)
+.env
+.env.local
+.env.*.local
+
+# dependencies and build output
+node_modules/
+dist/
+.cache/
+
+# runtime data: cached artwork (~2gb), llm shelf output, match pipeline
+# state — all derived from or describing the personal plex library
+data/
+
+# personal notes: plans, todo history, library listings and fix reports
+notes/
+
+# local tool state
+.impeccable/
+.claude/
+
+# logs and process output
+*.log
+nohup.out
+npm-debug.log*
+
+# os junk
+.DS_Store
+Thumbs.db

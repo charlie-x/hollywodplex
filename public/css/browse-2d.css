@@ -1,0 +1,122 @@
+/*
+ * browse-2d.css — styles for the 2D fallback grid browsing mode.
+ */
+
+#browse-2d {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #0a0a14;
+  overflow-y: auto;
+}
+
+.browse-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: rgba(10, 10, 20, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #1a1a2e;
+  flex-wrap: wrap;
+}
+
+.browse-select {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.browse-select:focus {
+  border-color: #ff6b9d;
+}
+
+.browse-search {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  outline: none;
+  flex: 1;
+  min-width: 150px;
+}
+
+.browse-search:focus {
+  border-color: #ff6b9d;
+}
+
+.browse-3d-btn {
+  padding: 6px 16px;
+  background: #ff6b9d;
+  color: #0a0a14;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.browse-3d-btn:hover {
+  background: #ff3060;
+}
+
+.browse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+  padding: 24px;
+}
+
+.browse-card {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.browse-card:hover {
+  transform: translateY(-4px);
+}
+
+.browse-card-poster {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #1a1a2e;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.browse-card-title {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #ccc;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browse-card-year {
+  font-size: 0.75rem;
+  color: #666;
+  text-align: center;
+}
+
+.browse-sentinel {
+  height: 1px;
+}
+
+@media (max-width: 600px) {
+  .browse-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 12px;
+  }
+}

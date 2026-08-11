@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hollywoodplex — your plex library as a video store</title>
+
+  <!-- three.js import map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%230a0a14'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='%23ff6b9d' font-family='monospace'>H</text></svg>">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/overlay.css">
+  <link rel="stylesheet" href="/css/browse-2d.css">
+</head>
+<body>
+
+  <!-- three.js canvas -->
+  <canvas id="store-canvas"></canvas>
+
+  <!-- loading screen overlay -->
+  <div id="loading-screen">
+    <div class="loading-content">
+      <h1 class="loading-title">hollywood<span class="title-accent">plex</span></h1>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" id="loading-bar"></div>
+      </div>
+      <p class="loading-message" id="loading-message">establishing connection to the video store...</p>
+    </div>
+  </div>
+
+  <!-- hud overlay -->
+  <div id="hud" style="display:none">
+    <div class="hud-crosshair"></div>
+    <div class="hud-bottom-left" id="hud-library-info"></div>
+    <div class="hud-bottom-right" id="hud-status"></div>
+    <div class="hud-top-center" id="hud-messages"></div>
+    <div class="hud-lock-prompt" id="hud-lock-prompt">click to explore</div>
+    <div class="hud-hover-card" id="hud-hover-card" style="display:none">
+      <span class="hover-card-badge">PLEX</span>
+      <div class="hover-card-text">
+        <div class="hover-card-title" id="hover-card-title"></div>
+        <div class="hover-card-meta" id="hover-card-meta"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- film detail modal -->
+  <div id="film-modal" class="modal-overlay" style="display:none">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel" id="modal-panel">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div class="modal-content" id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- search overlay -->
+  <div id="search-overlay" style="display:none">
+    <div class="search-container">
+      <div class="search-header">
+        <span class="search-prompt">&gt; search_</span>
+        <input type="text" class="search-input" id="search-input" autocomplete="off" spellcheck="false">
+        <button class="search-close" id="search-close">&times;</button>
+      </div>
+      <div class="search-results" id="search-results"></div>
+      <div class="search-hint">type to search, arrow keys to navigate, enter to select, esc to close</div>
+    </div>
+  </div>
+
+  <!-- 2D browse fallback -->
+  <div id="browse-2d" style="display:none">
+    <div class="browse-top-bar">
+      <select class="browse-select" id="browse-section-select"></select>
+      <select class="browse-select" id="browse-sort-select">
+        <option value="titleSort:asc">title a-z</option>
+        <option value="titleSort:desc">title z-a</option>
+        <option value="year:desc">year (newest)</option>
+        <option value="year:asc">year (oldest)</option>
+        <option value="rating:desc">rating (highest)</option>
+        <option value="addedAt:desc">recently added</option>
+        <option value="lastViewedAt:desc">recently viewed</option>
+      </select>
+      <input type="text" class="browse-search" id="browse-search" placeholder="search...">
+      <button class="browse-3d-btn" id="browse-to-3d">enter 3D store</button>
+    </div>
+    <div class="browse-grid" id="browse-grid"></div>
+    <div class="browse-sentinel" id="browse-sentinel"></div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
