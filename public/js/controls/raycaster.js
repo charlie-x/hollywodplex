@@ -68,7 +68,8 @@ export class CaseRaycaster {
   }
 
   update(dt = 0.016) {
-    if (!store.isPointerLocked) {
+    // gamepad mode drives the crosshair without pointer lock
+    if (!store.isPointerLocked && !store.gamepadActive) {
       this.#clearHover();
       return;
     }

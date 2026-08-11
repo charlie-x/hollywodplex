@@ -178,6 +178,10 @@ export function createStoreAudio() {
   // start on first pointer lock (a user gesture has happened by then)
   store.on('item-selected', click);
   document.addEventListener('keydown', (e) => {
+    // ignore while typing: "matrix" in the search box must not
+    // toggle the mute on every m
+    const tag = e.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.code === 'KeyM') {
       const nowMuted = toggleMute();
       store.emit('audio-muted', nowMuted);

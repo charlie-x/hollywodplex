@@ -393,7 +393,11 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
     ...extraFeatured.filter(s => s.items && s.items.length > 0),
     ...buildFeaturedSections(items),
   ];
-  const featuredSpacing = UNIT_WIDTH + 1.2;
+  // clamp spacing so a long row (many llm shelves) stays inside the
+  // walls instead of embedding the outer racks in them
+  const featuredSpacing = featured.length > 1
+    ? Math.min(UNIT_WIDTH + 1.2, (width - UNIT_WIDTH - 4) / (featured.length - 1))
+    : 0;
   const featuredStartX = cx - ((featured.length - 1) * featuredSpacing) / 2;
   featured.forEach((section, i) => {
     const x = featuredStartX + i * featuredSpacing;

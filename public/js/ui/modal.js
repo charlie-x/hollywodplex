@@ -22,9 +22,12 @@ export function createModal() {
 
   if (!overlay || !content) return { show() {}, hide() {}, isVisible() { return false; } };
 
+  let showSeq = 0; // late metadata responses must not resurrect a closed modal
+
   function hide() {
     // guard against re-entry: closeItem() emits item-closed which calls hide again
     if (overlay.style.display === 'none') return;
+    showSeq++;
     overlay.style.display = 'none';
     content.innerHTML = '';
     if (store.selectedItem) store.closeItem();
@@ -41,14 +44,18 @@ export function createModal() {
   });
 
   async function show(ratingKey) {
+    const seq = ++showSeq;
     overlay.style.display = 'flex';
     store.emit('overlay-opened'); // releases the mouse in 3d mode
     content.innerHTML = '<div style="padding:40px;text-align:center;color:#888;">loading...</div>';
 
     try {
       const item = await fetchMetadata(ratingKey);
+      // a slower response for an earlier film must not win
+      if (seq !== showSeq) return;
       renderItem(item, content);
     } catch (err) {
+      if (seq !== showSeq) return;
       content.innerHTML = `<div style="padding:40px;text-align:center;color:#d42027;">
         failed to load details: ${err.message}
       </div>`;
@@ -251,9 +258,13 @@ async function loadSeasons(show, seasonList, episodeList) {
 }
 
 async function loadEpisodes(show, season, episodeList) {
+  // a slower response for a previously clicked season must not fill
+  // the list while a different season's button is active
+  episodeList.dataset.season = String(season.ratingKey);
   episodeList.innerHTML = '<span style="color:#777;">loading episodes...</span>';
   try {
     const data = await fetchChildren(season.ratingKey);
+    if (episodeList.dataset.season !== String(season.ratingKey)) return;
     episodeList.innerHTML = '';
 
     for (const ep of data.items || []) {

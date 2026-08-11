@@ -66,7 +66,7 @@ export class SceneManager {
    */
   start() {
     const loop = () => {
-      requestAnimationFrame(loop);
+      this.rafId = requestAnimationFrame(loop);
 
       let dt = this.clock.getDelta();
       // clamp delta to avoid jumps when tab loses focus
@@ -88,6 +88,7 @@ export class SceneManager {
   }
 
   dispose() {
+    if (this.rafId) cancelAnimationFrame(this.rafId);
     window.removeEventListener('resize', this._onResize);
     this.animationCallbacks.length = 0;
     this.renderer.dispose();

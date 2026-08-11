@@ -44,9 +44,11 @@ export function createSearch(container) {
   closeBtn.addEventListener('click', hide);
 
   // search on input
+  let searchSeq = 0; // slow responses must not overwrite newer queries
   input.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const query = input.value.trim();
+    const seq = ++searchSeq;
     store.searchQuery = query;
 
     if (!query) {
@@ -70,15 +72,17 @@ export function createSearch(container) {
           sectionId: store.activeSectionId,
           size: 100,
         });
-        results = data.items || [];
-        selectedIdx = -1;
 
         // bound the cache — drop the oldest entry once full
         if (queryCache.size >= QUERY_CACHE_MAX) {
           queryCache.delete(queryCache.keys().next().value);
         }
-        queryCache.set(cacheKey, results);
+        queryCache.set(cacheKey, data.items || []);
 
+        // only the latest query may write to the visible results
+        if (seq !== searchSeq) return;
+        results = data.items || [];
+        selectedIdx = -1;
         renderResults();
       } catch (err) {
         console.warn('[search] search failed:', err.message);

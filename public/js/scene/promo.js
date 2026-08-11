@@ -67,35 +67,36 @@ function makeAFrame(item, header, position, rotationY) {
   const boardGeo = new THREE.BoxGeometry(0.9, 1.2, 0.03);
   const boardMat = new THREE.MeshStandardMaterial({ color: '#20232c', roughness: 0.7 });
   const headerTex = textTexture(header, HV_WHITE, HV_RED, 512, 96);
-  const loader = new THREE.TextureLoader();
+  const stripGeo = new THREE.PlaneGeometry(0.82, 0.18);
+  const stripMat = new THREE.MeshStandardMaterial({
+    map: headerTex, emissive: '#ffffff', emissiveMap: headerTex,
+    emissiveIntensity: 0.3, roughness: 0.6,
+  });
+  const posterGeo = new THREE.PlaneGeometry(0.78, 0.86);
+  // one material and one texture fetch shared by both faces — and a
+  // sized variant, not the full-resolution master
+  const posterMat = new THREE.MeshStandardMaterial({ color: '#161820', roughness: 0.6 });
+  if (item?.thumb) {
+    new THREE.TextureLoader().load(`${item.thumb}&width=512`, (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      posterMat.map = texture;
+      posterMat.color.set('#ffffff');
+      posterMat.needsUpdate = true;
+    });
+  }
 
   for (const side of [1, -1]) {
     const face = new THREE.Group();
     const board = new THREE.Mesh(boardGeo, boardMat);
     face.add(board);
 
-    const strip = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.82, 0.18),
-      new THREE.MeshStandardMaterial({
-        map: headerTex, emissive: '#ffffff', emissiveMap: headerTex,
-        emissiveIntensity: 0.3, roughness: 0.6,
-      }),
-    );
+    const strip = new THREE.Mesh(stripGeo, stripMat);
     strip.position.set(0, 0.46, 0.017);
     face.add(strip);
 
-    const posterMat = new THREE.MeshStandardMaterial({ color: '#161820', roughness: 0.6 });
-    const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.86), posterMat);
+    const poster = new THREE.Mesh(posterGeo, posterMat);
     poster.position.set(0, -0.1, 0.017);
     face.add(poster);
-    if (item?.thumb) {
-      loader.load(item.thumb, (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        posterMat.map = texture;
-        posterMat.color.set('#ffffff');
-        posterMat.needsUpdate = true;
-      });
-    }
 
     face.position.set(0, 0.68, side * 0.13);
     face.rotation.x = -side * lean;

@@ -47,14 +47,13 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     [2.4, 0.75, 0.7, 0.42],
     [0.9, 0.6, 0.82, 0.55], // right up against the pavement
   ]) {
-    const tex = baseFog.clone();
-    tex.needsUpdate = true;
     // wider with depth, so sightlines through the glass never find
-    // an edge no matter the viewing angle
+    // an edge no matter the viewing angle. the texture is shared —
+    // banks drift by position, so nothing per-bank ever mutates it
     const bank = new THREE.Mesh(
       new THREE.PlaneGeometry(STOREFRONT_WIDTH + 20 + dz * 1.6, 7),
       new THREE.MeshBasicMaterial({
-        map: tex, color: '#c4c6ca', transparent: true, opacity: 0,
+        map: baseFog, color: '#c4c6ca', transparent: true, opacity: 0,
         depthWrite: false,
       }),
     );
@@ -66,12 +65,10 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   }
 
   // low rolling mist lying over the tarmac itself
-  const groundTex = baseFog.clone();
-  groundTex.needsUpdate = true;
   const groundMist = new THREE.Mesh(
     new THREE.PlaneGeometry(STOREFRONT_WIDTH + 22, 16),
     new THREE.MeshBasicMaterial({
-      map: groundTex, color: '#c4c6ca', transparent: true, opacity: 0,
+      map: baseFog, color: '#c4c6ca', transparent: true, opacity: 0,
       depthWrite: false,
     }),
   );
@@ -143,8 +140,11 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     const s = pass.scale * (1 + 0.05 * Math.sin(pass.t * 2.1));
     shape.scale.set(s * (pass.flip ? -1 : 1), s * (pass.stretchY || 1), 1);
     // solidity comes entirely from how close it dares to come — the
-    // curve is tuned so mid-fog still reads strongly
-    shape.material.opacity = Math.max(0, 0.72 - (z - 4.0) * 0.06) * (pass.dim || 1);
+    // curve is tuned so mid-fog still reads strongly. scaled by the
+    // fog itself: a shape must fade with a clearing car park, not
+    // hang solid in plain air through the roll-out
+    shape.material.opacity = Math.max(0, 0.72 - (z - 4.0) * 0.06)
+      * (pass.dim || 1) * Math.min(1, fogLevel * 1.5);
 
     if (f >= 1) {
       pass = null;

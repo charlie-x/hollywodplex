@@ -39,10 +39,11 @@ export function createTasteScanner(scene, position) {
   group.add(button);
 
   // label wrapped on the column front
+  const labelTex = labelTexture();
   const label = new THREE.Mesh(
     new THREE.PlaneGeometry(0.34, 0.2),
     new THREE.MeshStandardMaterial({
-      map: labelTexture(), emissive: '#ffffff', emissiveMap: labelTexture(),
+      map: labelTex, emissive: '#ffffff', emissiveMap: labelTex,
       emissiveIntensity: 0.3, roughness: 0.6,
     }),
   );

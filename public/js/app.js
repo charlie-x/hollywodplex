@@ -64,6 +64,7 @@ async function main() {
     console.warn('[app] webgl unavailable, falling back to 2d mode:', err.message);
     loadingScreen.hide();
     canvas.style.display = 'none';
+    store.webglAvailable = false; // browse-2d hides its "to 3d" button
     createModal();
     createBrowse2D();
     store.setMode('2d');
@@ -350,6 +351,7 @@ async function main() {
     ...storefront.collisionBoxes,
     ...promo.collisionBoxes,
     ...counter.collisionBoxes,
+    kiosk.getBoundingBox(),
     ...(scanner ? [new THREE.Box3(
       new THREE.Vector3(scanner.group.position.x - 0.25, 0, scanner.group.position.z - 0.25),
       new THREE.Vector3(scanner.group.position.x + 0.25, 1.2, scanner.group.position.z + 0.25),
@@ -577,12 +579,17 @@ async function main() {
   });
 
   // overlays (search, film card) release the mouse so their buttons
-  // are clickable, and re-capture it when they close in 3d mode
+  // are clickable, and re-capture it when they close in 3d mode.
+  // refcounted: closing search over an open film card must not grab
+  // the mouse back while the card is still showing
+  let overlayDepth = 0;
   store.on('overlay-opened', () => {
+    overlayDepth++;
     if (store.isPointerLocked) pointerLock.exitLock();
   });
   store.on('overlay-closed', () => {
-    if (store.mode === '3d') pointerLock.requestLock();
+    overlayDepth = Math.max(0, overlayDepth - 1);
+    if (overlayDepth === 0 && store.mode === '3d') pointerLock.requestLock();
   });
 
   // ---- start ----

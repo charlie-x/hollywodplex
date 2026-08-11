@@ -55,6 +55,7 @@ export function createPlayer() {
   let video = null;
   let timelineTimer = null;
   let currentRatingKey = null;
+  let keyHandler = null;
 
   function stopReporting(finalState) {
     if (timelineTimer) {
@@ -73,6 +74,12 @@ export function createPlayer() {
   }
 
   function close() {
+    // every close path drops the escape listener, not just escape
+    // itself — otherwise one stale listener accumulates per play
+    if (keyHandler) {
+      document.removeEventListener('keydown', keyHandler);
+      keyHandler = null;
+    }
     stopReporting('stopped');
     if (video) {
       video.pause();
@@ -126,14 +133,11 @@ export function createPlayer() {
     overlay = div({ class: 'player-overlay' }, titleBar, closeBtn, video);
     document.body.appendChild(overlay);
 
-    // escape closes the player
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        close();
-        document.removeEventListener('keydown', onKey);
-      }
+    // escape closes the player; close() removes the listener
+    keyHandler = (e) => {
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', keyHandler);
   }
 
   return { play, close, isOpen: () => !!overlay };

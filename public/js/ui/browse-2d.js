@@ -24,6 +24,12 @@ export function createBrowse2D() {
   let totalSize = 0;
   let isLoading = false;
   let searchDebounce = null;
+  let loadSeq = 0; // invalidates in-flight responses on reset
+
+  // without webgl there is no 3d mode to return to
+  if (store.webglAvailable === false && to3dBtn) {
+    to3dBtn.style.display = 'none';
+  }
 
   // populate section dropdown
   for (const lib of store.libraries) {
@@ -34,7 +40,10 @@ export function createBrowse2D() {
   }
 
   async function loadPage(reset = false) {
-    if (isLoading) return;
+    // appends wait their turn; a reset supersedes whatever is in
+    // flight rather than being silently dropped
+    if (isLoading && !reset) return;
+    const seq = ++loadSeq;
     isLoading = true;
 
     if (reset) {
@@ -54,6 +63,7 @@ export function createBrowse2D() {
       } else {
         data = await fetchItems(sectionId, { start: offset, size: 50, sort });
       }
+      if (seq !== loadSeq) return; // superseded while in flight
 
       if (reset) {
         items = data.items || [];
@@ -62,12 +72,12 @@ export function createBrowse2D() {
       }
       totalSize = data.totalSize || 0;
 
-      renderCards(reset ? data.items : data.items);
+      renderCards(data.items);
       offset += data.items ? data.items.length : 0;
     } catch (err) {
       console.warn('[browse-2d] failed to load:', err.message);
     } finally {
-      isLoading = false;
+      if (seq === loadSeq) isLoading = false;
     }
   }
 

@@ -128,7 +128,13 @@ async function generate(sectionId) {
   const watched = catalogue.filter(i => i.viewCount > 0);
 
   if (watched.length === 0) {
-    return { generatedAt: Date.now(), shelves: [] };
+    // persist the empty result: without a cache file every storefront
+    // load would kick off another full-library sweep and the client
+    // would sit on "generating" forever
+    const empty = { generatedAt: Date.now(), sectionId, shelves: [] };
+    mkdirSync(dirname(CACHE_FILE), { recursive: true });
+    writeFileSync(CACHE_FILE, JSON.stringify(empty, null, 2));
+    return empty;
   }
 
   const picks = await askClaude(watched, catalogue);

@@ -28,11 +28,12 @@ export function createCheckoutCounter(position, rotationY = 0) {
   body.castShadow = true;
   group.add(body);
 
+  const fasciaTex = fasciaTexture();
   const fascia = new THREE.Mesh(
     new THREE.PlaneGeometry(3.5, 0.85),
     new THREE.MeshStandardMaterial({
-      map: fasciaTexture(), emissive: '#ffffff',
-      emissiveMap: fasciaTexture(), emissiveIntensity: 0.15, roughness: 0.6,
+      map: fasciaTex, emissive: '#ffffff',
+      emissiveMap: fasciaTex, emissiveIntensity: 0.15, roughness: 0.6,
     }),
   );
   fascia.position.set(0, 0.58, 0.38);
@@ -59,11 +60,12 @@ export function createCheckoutCounter(position, rotationY = 0) {
   crt.rotation.y = 0.35; // angled towards the clerk's spot
   group.add(crt);
 
+  const crtTex = crtScreenTexture();
   const screen = new THREE.Mesh(
     new THREE.PlaneGeometry(0.3, 0.24),
     new THREE.MeshStandardMaterial({
-      map: crtScreenTexture(), emissive: '#ffffff',
-      emissiveMap: crtScreenTexture(), emissiveIntensity: 0.9, roughness: 0.4,
+      map: crtTex, emissive: '#ffffff',
+      emissiveMap: crtTex, emissiveIntensity: 0.9, roughness: 0.4,
     }),
   );
   screen.position.set(-1.03, 1.41, 0.115);

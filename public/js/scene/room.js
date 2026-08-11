@@ -41,6 +41,7 @@ export function createRoom(scene, dims = {}) {
   const dingy = dims.style === 'dingy';
   const group = new THREE.Group();
   const collisionBoxes = [];
+  const ownedLights = []; // lights added straight to the scene, for dispose
   let bulbMesh = null;
   let update = null;
 
@@ -143,12 +144,13 @@ export function createRoom(scene, dims = {}) {
 
   // ---- lighting ----
   if (dims.mainLighting !== false) {
-    createMainLighting(scene, cx, cz, width, depth);
+    createMainLighting(scene, cx, cz, width, depth, ownedLights);
   } else if (dingy) {
     // the back room: one dim red bulb with physical falloff, nothing else
     const red = new THREE.PointLight('#ff3322', 14, 0, 2);
     red.position.set(cx, ROOM_HEIGHT - 0.55, cz);
     scene.add(red);
+    ownedLights.push(red);
 
     // the bulb never sits quite steady: a slow breathe with a mains
     // buzz on top, and the occasional sputter towards going out
@@ -174,6 +176,7 @@ export function createRoom(scene, dims = {}) {
       area.position.set(cx + ox, ROOM_HEIGHT - 0.1, cz + oz);
       area.lookAt(cx + ox, 0, cz + oz);
       scene.add(area);
+      ownedLights.push(area);
     }
   }
 
@@ -185,6 +188,9 @@ export function createRoom(scene, dims = {}) {
     collisionBoxes,
     update,
     dispose() {
+      // the room's lights live on the scene, not in the group — they
+      // must go too or a disposed room keeps lighting the world
+      for (const light of ownedLights) scene.remove(light);
       scene.remove(group);
     },
   };
@@ -373,14 +379,16 @@ function createMarqueeSign(text) {
  * key light for directional depth. speculars come from the environment
  * map set up in scene-manager.
  */
-function createMainLighting(scene, cx, cz, width, depth) {
+function createMainLighting(scene, cx, cz, width, depth, ownedLights = []) {
   // low ambient — just enough that nothing crushes to black
   const ambient = new THREE.AmbientLight('#e8e8ff', 0.14);
   scene.add(ambient);
+  ownedLights.push(ambient);
 
   // faint sky/ground bounce: white ceiling above, carpet tone below
   const hemi = new THREE.HemisphereLight('#f4f2ec', '#242c52', 0.15);
   scene.add(hemi);
+  ownedLights.push(hemi);
 
   // overhead fluorescent banks as area lights, 3 x 2 grid.
   // rect area lights have true physical falloff and soft pooling,
@@ -398,6 +406,7 @@ function createMainLighting(scene, cx, cz, width, depth) {
       area.position.set(x, ROOM_HEIGHT - 0.1, z);
       area.lookAt(x, 0, z);
       scene.add(area);
+      ownedLights.push(area);
     }
   }
 
@@ -415,4 +424,5 @@ function createMainLighting(scene, cx, cz, width, depth) {
   keyLight.shadow.camera.bottom = -depth;
   keyLight.shadow.bias = -0.0001;
   scene.add(keyLight);
+  ownedLights.push(keyLight);
 }

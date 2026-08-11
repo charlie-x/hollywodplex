@@ -189,7 +189,12 @@ export class ImageLoader {
   disposeAll() {
     this.#cache.clear();
     this.#inflight.clear();
-    this.#queue.length = 0;
+    // the queue is a map: settle every waiter so no caller hangs on
+    // a promise that will never resolve, then actually empty it
+    for (const [, entry] of this.#queue) {
+      for (const resolve of entry.resolvers) resolve(null);
+    }
+    this.#queue.clear();
     this.#active = 0;
   }
 

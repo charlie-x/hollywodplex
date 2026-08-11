@@ -49,11 +49,22 @@ router.get('/', async (req, res, next) => {
 
     upstream.data.pipe(res);
 
+    // an upstream failure mid-stream (media server restart, reset
+    // connection) must not become an uncaught exception that kills
+    // the whole process — pipe() does not forward stream errors
+    upstream.data.on('error', () => {
+      upstream.data.destroy();
+      res.destroy();
+    });
+
     // stop pulling from the server if the client disconnects (e.g. seeking)
     res.on('close', () => {
       upstream.data.destroy();
     });
   } catch (err) {
+    // a rejected stream request can still carry a live response body;
+    // drop it or the upstream socket stays open and undrained
+    err.response?.data?.destroy?.();
     next(err);
   }
 });

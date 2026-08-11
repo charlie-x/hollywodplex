@@ -419,12 +419,17 @@ async function playstateRequest(kind, userId, itemId, params) {
     return jellyfinClient.delete(base, { params: p });
   };
 
+  // capture the mode this request starts with: concurrent 404s must
+  // each retry the opposite of their own attempt, not blind-toggle a
+  // shared flag two in-flight requests can flip back and forth
+  const attempted = playstateModern;
   try {
-    await call(playstateModern);
+    await call(attempted);
   } catch (err) {
     if ((err.status === 404 || err.status === 405)) {
-      playstateModern = !playstateModern;
-      await call(playstateModern);
+      const other = !attempted;
+      await call(other);
+      playstateModern = other; // commit only after the retry succeeds
       return;
     }
     throw err;

@@ -211,10 +211,11 @@ export function createZoltar(scene, position, rotationY = 0) {
   group.add(coinSlot);
 
   // ---- header sign ----
+  const signTex = signTexture();
   const sign = new THREE.Mesh(
     new THREE.PlaneGeometry(0.95, 0.3),
     new THREE.MeshStandardMaterial({
-      map: signTexture(), emissive: '#ffffff', emissiveMap: signTexture(),
+      map: signTex, emissive: '#ffffff', emissiveMap: signTex,
       emissiveIntensity: 0.45, roughness: 0.6,
     }),
   );

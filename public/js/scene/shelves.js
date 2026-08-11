@@ -70,6 +70,8 @@ export class Shelves {
     this.caseByKey = new Map();
     this.urlToKey = new Map();
     this.updateTimer = 0;
+    this.generation = 0; // bumped on clear() to invalidate in-flight loads
+    this.stickerMat = null;
     scene.add(this.group);
 
     // chain evict handlers so multiple rooms share one image loader.
@@ -104,20 +106,12 @@ export class Shelves {
     const matrix = new THREE.Matrix4();
     const scale = new THREE.Vector3(1, 1, 1);
     const colour = new THREE.Color();
-    const stickerLocal = new THREE.Matrix4()
-      .makeRotationZ(-0.18)
-      .setPosition(CASE_WIDTH / 2 - 0.085, CASE_HEIGHT / 2 - 0.055, CASE_DEPTH / 2 + 0.004);
-    const stickerMatrices = [];
 
     slots.forEach((slot, i) => {
       matrix.compose(slot.position, slot.quat, scale);
       this.bodiesMesh.setMatrixAt(i, matrix);
       colour.set(SHELL_COLOURS[hashKey(slot.item.ratingKey) % SHELL_COLOURS.length]);
       this.bodiesMesh.setColorAt(i, colour);
-
-      if (slot.item.viewCount > 0) {
-        stickerMatrices.push(new THREE.Matrix4().multiplyMatrices(matrix, stickerLocal));
-      }
 
       const record = {
         item: slot.item,
@@ -149,13 +143,39 @@ export class Shelves {
     if (this.bodiesMesh.instanceColor) this.bodiesMesh.instanceColor.needsUpdate = true;
     this.group.add(this.bodiesMesh);
 
-    if (stickerMatrices.length > 0) {
-      const stickerMat = new THREE.MeshBasicMaterial({ map: makeRentedTexture() });
-      this.stickersMesh = new THREE.InstancedMesh(stickerGeo, stickerMat, stickerMatrices.length);
-      stickerMatrices.forEach((m, i) => this.stickersMesh.setMatrixAt(i, m));
-      this.stickersMesh.instanceMatrix.needsUpdate = true;
-      this.group.add(this.stickersMesh);
+    this.#rebuildStickers();
+  }
+
+  /*
+   * (re)build the rented sticker instances from the cases' CURRENT
+   * items — also called after a restock, where the watched flags of
+   * the swapped-in stock differ from what populate() baked.
+   */
+  #rebuildStickers() {
+    if (this.stickersMesh) {
+      this.group.remove(this.stickersMesh);
+      this.stickersMesh.dispose();
+      this.stickersMesh = null;
     }
+    const stickerLocal = new THREE.Matrix4()
+      .makeRotationZ(-0.18)
+      .setPosition(CASE_WIDTH / 2 - 0.085, CASE_HEIGHT / 2 - 0.055, CASE_DEPTH / 2 + 0.004);
+    const scale = new THREE.Vector3(1, 1, 1);
+    const caseMatrix = new THREE.Matrix4();
+    const matrices = [];
+    for (const c of this.cases) {
+      if (!(c.item.viewCount > 0)) continue;
+      caseMatrix.compose(c.position, c.quat, scale);
+      matrices.push(new THREE.Matrix4().multiplyMatrices(caseMatrix, stickerLocal));
+    }
+    if (matrices.length === 0) return;
+    if (!this.stickerMat) {
+      this.stickerMat = new THREE.MeshBasicMaterial({ map: makeRentedTexture() });
+    }
+    this.stickersMesh = new THREE.InstancedMesh(stickerGeo, this.stickerMat, matrices.length);
+    matrices.forEach((m, i) => this.stickersMesh.setMatrixAt(i, m));
+    this.stickersMesh.instanceMatrix.needsUpdate = true;
+    this.group.add(this.stickersMesh);
   }
 
   /*
@@ -284,8 +304,12 @@ export class Shelves {
         }
       } else if (c.loading && c.loadingUrl) {
         // left the active set while still queued: cancel so requests
-        // for where the player IS aren't stuck behind where they WERE
-        this.imageLoader.cancel(c.loadingUrl);
+        // for where the player IS aren't stuck behind where they WERE.
+        // but not when an on-screen duplicate of the same film shares
+        // the url — cancelling would kill the visible copy's load too
+        const twins = this.caseByKey.get(c.item.ratingKey) || [];
+        const shared = twins.some(o => o !== c && o.loadingUrl === c.loadingUrl && active.has(o));
+        if (!shared) this.imageLoader.cancel(c.loadingUrl);
       } else if (c.loaded && c._dist > TEXTURE_UNLOAD_RANGE) {
         const url = c.loadedUrl;
         this.#unloadPoster(c);
@@ -304,12 +328,18 @@ export class Shelves {
     if (!base) return;
     const url = `${base}&width=${size}`;
     this.urlToKey.set(url, c.item.ratingKey);
+    // remember what this load was FOR: a restock can swap the case's
+    // item, and a clear() can rebuild the room, while the request is
+    // in flight — a late texture must not land on the wrong film
+    const forKey = c.item.ratingKey;
+    const gen = this.generation;
     c.loading = true;
     c.loadingUrl = url;
     this.imageLoader.loadTexture(url, c._dist ?? 0).then(texture => {
       c.loading = false;
       c.loadingUrl = null;
       if (!texture || !texture.isTexture) return; // cancelled or failed
+      if (gen !== this.generation || c.item.ratingKey !== forKey) return; // stale
       if (c.loaded && c.loadedSize >= size) return; // stale upgrade
 
       const oldUrl = c.loadedUrl;
@@ -419,8 +449,10 @@ export class Shelves {
       changed++;
     }
 
-    if (changed > 0 && this.bodiesMesh.instanceColor) {
-      this.bodiesMesh.instanceColor.needsUpdate = true;
+    if (changed > 0) {
+      if (this.bodiesMesh.instanceColor) this.bodiesMesh.instanceColor.needsUpdate = true;
+      // the rented stickers were baked from the old stock
+      this.#rebuildStickers();
     }
     return changed;
   }
@@ -432,6 +464,7 @@ export class Shelves {
   getCollisionBoxes() { return this.collisionBoxes; }
 
   clear() {
+    this.generation++; // in-flight poster loads for the old stock go stale
     for (const c of this.cases) this.#unloadPoster(c);
     this.cases.length = 0;
     this.loadedUrls.clear();
@@ -442,6 +475,7 @@ export class Shelves {
     if (this.bodiesMesh) {
       this.group.remove(this.bodiesMesh);
       this.bodiesMesh.dispose();
+      this.bodiesMesh.material.dispose();
       this.bodiesMesh = null;
     }
     if (this.stickersMesh) {
@@ -456,12 +490,29 @@ export class Shelves {
     }
     this.furnitureMeshes.length = 0;
 
-    for (const s of this.genreSigns) this.group.remove(s);
+    // signs carry their own canvas textures, materials and geometry
+    for (const s of this.genreSigns) {
+      s.traverse(o => {
+        if (!o.isMesh) return;
+        o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) {
+          if (m.map) m.map.dispose();
+          m.dispose();
+        }
+      });
+      this.group.remove(s);
+    }
     this.genreSigns.length = 0;
   }
 
   dispose() {
     this.clear();
+    if (this.stickerMat) {
+      if (this.stickerMat.map) this.stickerMat.map.dispose();
+      this.stickerMat.dispose();
+      this.stickerMat = null;
+    }
     this.scene.remove(this.group);
   }
 }
