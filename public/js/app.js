@@ -16,6 +16,7 @@ import { createStorefront, STOREFRONT_WIDTH } from './scene/storefront.js';
 import { createPromoDisplays } from './scene/promo.js';
 import { createTasteScanner } from './scene/scan-button.js';
 import { createZoltar } from './scene/zoltar.js';
+import { createMistEvent } from './scene/mist.js';
 import { createDustParticles } from './scene/effects.js';
 import { FirstPersonControls } from './controls/first-person.js';
 import { setupPointerLock } from './controls/pointer-lock.js';
@@ -325,6 +326,9 @@ async function main() {
 
   // atmospheric effects
   const dust = createDustParticles(sceneManager.scene, movieRoom.dimensions);
+
+  // the mist comes for the car park now and then. do not go out there
+  const mist = createMistEvent(sceneManager.scene, dims);
   store.setLoadingProgress(0.9);
 
   // ---- controls ----
@@ -524,6 +528,9 @@ async function main() {
 
     // zoltar's idle shimmer and fortune performance
     zoltar.update(dt);
+
+    // the mist event, if it is due
+    mist.update(dt);
 
     // footsteps while moving
     const moving = store.isPointerLocked
