@@ -53,11 +53,17 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 
 the llm features work with either backend. anthropic is used when both
-are configured (set `LLM_PROVIDER=ollama` to override). ollama needs a
-model with a large context window for the shelf curation, since the
-whole catalogue goes into the prompt — `OLLAMA_NUM_CTX` (default 32768)
-must fit within what your model and ram can handle, and pick quality
-depends heavily on the model's film knowledge.
+are configured (set `LLM_PROVIDER=ollama` to override), and the
+anthropic model defaults to claude-opus-5 (`ANTHROPIC_MODEL` overrides
+it). ollama needs a model with a large context window for the shelf
+curation, since the whole catalogue goes into the prompt —
+`OLLAMA_NUM_CTX` (default 32768) must fit within what your model and
+ram can handle, and pick quality depends heavily on the model's film
+knowledge.
+
+curated shelves are cached in `data/shelves.json` and refreshed in the
+background every three days; `POST /api/recommendations/refresh`
+forces a regeneration immediately.
 
 `.env` is gitignored — keep your token and keys there and nowhere else.
 
@@ -97,8 +103,9 @@ files plex's agent could not identify show their filename as the
 title with no artwork. open such a film in the store and use the
 "fix match" button to search the agent and apply the right match.
 
-for bulk cleanup there is a three-stage pipeline (requires the
-anthropic key, since a model judges each candidate list):
+for bulk cleanup there is a three-stage pipeline (requires an llm
+backend — anthropic or ollama — since a model judges each candidate
+list):
 
 ```bash
 node tools/fix-unmatched/scan.js    # gather match candidates
@@ -108,6 +115,14 @@ node tools/fix-unmatched/apply.js   # apply and write a report
 
 each stage checkpoints to `data/fix-unmatched.json` and is safe to
 re-run; matches can be reversed from plex with "unmatch".
+
+## the data directory
+
+`data/` is created at runtime and safe to delete wholesale: it holds
+the artwork disk cache (uncapped — it grows to roughly the size of
+your library's artwork, and spares your plex server repeat fetches),
+the cached llm shelves, and the match pipeline state. deleting it just
+means everything is refetched or regenerated on demand.
 
 ## security notes
 
