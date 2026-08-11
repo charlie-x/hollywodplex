@@ -80,11 +80,13 @@ export function createTasteScanner(scene, position) {
   let scanT = -1;
   let onDoneCb = null;
   let pulse = 0;
+  let follow = null; // live position reference — the beam tracks the viewer
   const target = new THREE.Vector3();
   const emitter = new THREE.Vector3();
 
   function playScan(playerPos, onDone) {
     if (scanT >= 0) return;
+    follow = playerPos;
     target.set(playerPos.x, 0, playerPos.z);
     scanT = 0;
     onDoneCb = onDone || null;
@@ -107,6 +109,9 @@ export function createTasteScanner(scene, position) {
     // sweep up, then back down
     const sweep = p < 0.5 ? p * 2 : 2 - p * 2;
     const scanY = 0.12 + sweep * 1.72;
+
+    // the beam follows the viewer if they shuffle mid-test
+    if (follow) target.set(follow.x, 0, follow.z);
 
     // fan from the button tip to a 1m line across the customer
     emitter.set(group.position.x, 1.08, group.position.z);
