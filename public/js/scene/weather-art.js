@@ -32,12 +32,13 @@ export function softFogTexture() {
 }
 
 /*
- * three vague silhouettes, never clearly seen: a many-limbed drifter,
- * a single sweeping tentacle, and something far too tall — only its
- * legs pass through the frame.
+ * three vague silhouettes, never clearly seen: a shapeless hulking
+ * mass, a single sweeping tentacle, and something far too tall —
+ * only its legs pass through the frame. nothing here has an outline
+ * clean enough to name, which is what keeps it unsettling.
  */
 export function creatureTextures() {
-  return [drifter(), tentacle(), stilts()];
+  return [hulk(), tentacle(), stilts()];
 }
 
 function shapeCanvas() {
@@ -49,21 +50,40 @@ function shapeCanvas() {
   return { canvas, ctx };
 }
 
-function drifter() {
+function hulk() {
   const { canvas, ctx } = shapeCanvas();
-  ctx.fillStyle = 'rgba(0,0,0,0.9)';
-  ctx.beginPath();
-  ctx.ellipse(128, 90, 70, 42, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-  ctx.lineWidth = 9;
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 6; i++) {
+  // blurred, so the boundary never quite resolves out of the fog
+  ctx.filter = 'blur(3px)';
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  // an asymmetric pile of overlapping lumps, heavier on one side —
+  // deliberately nothing like an animal outline
+  const lumps = [
+    [104, 92, 56, 40, 0.3],
+    [152, 78, 46, 34, -0.4],
+    [70, 108, 34, 26, 0.1],
+    [178, 104, 30, 22, 0.5],
+    [126, 118, 44, 28, -0.2],
+    [92, 66, 30, 24, 0.6],
+  ];
+  for (const [x, y, rx, ry, rot] of lumps) {
     ctx.beginPath();
-    ctx.moveTo(90 + i * 18, 110);
-    ctx.quadraticCurveTo(80 + i * 20, 150, 60 + i * 26, 158);
-    ctx.stroke();
+    ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+    ctx.fill();
   }
+  // two tapering hints of appendage at odd angles, nothing paired
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 15;
+  ctx.beginPath();
+  ctx.moveTo(84, 122);
+  ctx.quadraticCurveTo(52, 142, 28, 148);
+  ctx.stroke();
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(176, 116);
+  ctx.quadraticCurveTo(206, 136, 226, 130);
+  ctx.stroke();
+  ctx.filter = 'none';
   return new THREE.CanvasTexture(canvas);
 }
 
