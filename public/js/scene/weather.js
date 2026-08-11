@@ -91,12 +91,24 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       thumped: false,
       ...overrides,
     };
-    const texIdx = Math.floor(Math.random() * shapeTexs.length);
+    // charges are made by the smaller things. the tall one is rare,
+    // slow, distant and faint — the less it shows, the bigger it feels
+    const texIdx = pass.charge
+      ? Math.floor(Math.random() * 2)
+      : (Math.random() < 0.15 ? 2 : Math.floor(Math.random() * 2));
     shape.material.map = shapeTexs[texIdx];
     shape.material.needsUpdate = true;
-    // the tall one gets stretched skyward so only legs cross the view
-    pass.stretchY = texIdx === 2 ? 1.9 : 1;
-    if (texIdx === 2) pass.y = 2.2 + Math.random() * 0.5;
+    pass.dim = 1;
+    pass.stretchY = 1;
+    if (texIdx === 2) {
+      // stretched skyward so only legs cross the view, kept well out
+      // in the murk, taking its time
+      pass.stretchY = 1.9;
+      pass.y = 2.2 + Math.random() * 0.5;
+      pass.zNear = Math.max(pass.zNear, 5.5 + Math.random() * 2);
+      pass.dur = 14 + Math.random() * 6;
+      pass.dim = 0.6;
+    }
     shape.visible = true;
   }
 
@@ -118,7 +130,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     const s = pass.scale * (1 + 0.05 * Math.sin(pass.t * 2.1));
     shape.scale.set(s * (pass.flip ? -1 : 1), s * (pass.stretchY || 1), 1);
     // solidity comes entirely from how close it dares to come
-    shape.material.opacity = Math.max(0, 0.62 - (z - 2.0) * 0.055);
+    shape.material.opacity = Math.max(0, 0.62 - (z - 2.0) * 0.055) * (pass.dim || 1);
 
     // a charge slams the glass at the moment of closest approach
     if (pass.charge && !pass.thumped && f >= 0.5) {
