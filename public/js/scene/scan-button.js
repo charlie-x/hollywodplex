@@ -52,63 +52,90 @@ export function createTasteScanner(scene, position) {
   group.position.copy(position);
   scene.add(group);
 
-  // ---- the laser sweep, spawned over the customer ----
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: '#ff2233', transparent: true, opacity: 0.9, depthWrite: false,
+  // ---- the electron beam: a green fan emitted from the button that
+  // converges on a bright scan line sweeping the customer up and down,
+  // like a supermarket scanner aimed at a person ----
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: '#3dff6e', transparent: true, opacity: 0.2,
+    depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
   });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.015, 8, 36), ringMat);
-  ring.rotation.x = Math.PI / 2;
-  ring.visible = false;
-  scene.add(ring);
+  const beamGeo = new THREE.BufferGeometry();
+  beamGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.frustumCulled = false;
+  beam.visible = false;
+  scene.add(beam);
 
-  const shellMat = new THREE.MeshBasicMaterial({
-    color: '#ff3344', transparent: true, opacity: 0.06,
-    depthWrite: false, side: THREE.DoubleSide,
+  const barMat = new THREE.MeshBasicMaterial({
+    color: '#a8ffc4', transparent: true, opacity: 0.9,
+    depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  const shell = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.56, 0.56, 1.95, 24, 1, true),
-    shellMat,
-  );
-  shell.visible = false;
-  scene.add(shell);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.02, 0.02), barMat);
+  bar.visible = false;
+  scene.add(bar);
 
-  const glow = new THREE.PointLight('#ff2233', 0, 4, 2);
+  const glow = new THREE.PointLight('#3dff6e', 0, 4, 2);
   scene.add(glow);
 
   let scanT = -1;
   let onDoneCb = null;
   let pulse = 0;
   const target = new THREE.Vector3();
+  const emitter = new THREE.Vector3();
 
   function playScan(playerPos, onDone) {
     if (scanT >= 0) return;
     target.set(playerPos.x, 0, playerPos.z);
     scanT = 0;
     onDoneCb = onDone || null;
-    ring.visible = true;
-    shell.visible = true;
-    shell.position.set(target.x, 0.975, target.z);
-    glow.intensity = 6;
+    beam.visible = true;
+    bar.visible = true;
+    glow.intensity = 5;
   }
 
   function update(dt) {
     pulse += dt;
-    buttonMat.emissiveIntensity = 0.6 + 0.35 * (0.5 + 0.5 * Math.sin(pulse * 2.4));
+    // slow breathe: smoothstep the sine so the glow eases in and out
+    // with a gentle dwell at both the bright and dim ends
+    const breathe = 0.5 + 0.5 * Math.sin(pulse * 1.4);
+    const eased = breathe * breathe * (3 - 2 * breathe);
+    buttonMat.emissiveIntensity = 0.2 + 0.9 * eased;
 
     if (scanT < 0) return;
     scanT += dt;
     const p = Math.min(1, scanT / SCAN_DURATION);
     // sweep up, then back down
     const sweep = p < 0.5 ? p * 2 : 2 - p * 2;
-    ring.position.set(target.x, 0.08 + sweep * 1.78, target.z);
-    glow.position.copy(ring.position);
-    ringMat.opacity = 0.55 + 0.35 * Math.abs(Math.sin(scanT * 40)); // laser buzz
-    shellMat.opacity = 0.05 + 0.03 * Math.sin(scanT * 25);
+    const scanY = 0.12 + sweep * 1.72;
+
+    // fan from the button tip to a 1m line across the customer
+    emitter.set(group.position.x, 1.08, group.position.z);
+    let dx = target.x - emitter.x;
+    let dz = target.z - emitter.z;
+    const len = Math.hypot(dx, dz) || 1;
+    dx /= len;
+    dz /= len;
+    const px = -dz * 0.5; // half-width perpendicular
+    const pz = dx * 0.5;
+
+    const pos = beamGeo.attributes.position;
+    pos.setXYZ(0, emitter.x, emitter.y, emitter.z);
+    pos.setXYZ(1, target.x - px, scanY, target.z - pz);
+    pos.setXYZ(2, target.x + px, scanY, target.z + pz);
+    pos.needsUpdate = true;
+
+    bar.position.set(target.x, scanY, target.z);
+    bar.rotation.y = Math.atan2(-dx, -dz);
+    glow.position.set(target.x, scanY, target.z);
+
+    // electron beam shimmer
+    beamMat.opacity = 0.14 + 0.1 * Math.abs(Math.sin(scanT * 45));
+    barMat.opacity = 0.7 + 0.3 * Math.abs(Math.sin(scanT * 60));
 
     if (p >= 1) {
       scanT = -1;
-      ring.visible = false;
-      shell.visible = false;
+      beam.visible = false;
+      bar.visible = false;
       glow.intensity = 0;
       const cb = onDoneCb;
       onDoneCb = null;
