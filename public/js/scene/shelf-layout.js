@@ -386,7 +386,9 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
   };
 
   // ---- featured gondola row by the entrance (skipped in plain mode) ----
-  const featuredZ = cz + depth / 2 - 4.5;
+  // held back from the entrance so the storefront glass, counter and
+  // promo displays keep a clear walkway in front of the first racks
+  const featuredZ = cz + depth / 2 - 6.2;
   const featured = opts.plainTitle ? [] : [
     ...extraFeatured.filter(s => s.items && s.items.length > 0),
     ...buildFeaturedSections(items),
@@ -413,6 +415,28 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
     : wallUnitsFromRuns(buildWallRuns(dims, opts.wallDoorways));
   let wallIdx = 0;
 
+  // family-friendly sections keep their distance from the 18+ door:
+  // units near it are held back and handed to the next grown-up
+  // section instead
+  const FAMILY_TITLES = new Set(['family', 'children', 'kids', 'animation']);
+  const adultDoor = opts.adultDoor || null;
+  const nearAdultDoor = (unit) => adultDoor
+    && Math.hypot(unit.centre.x - adultDoor.x, unit.centre.z - adultDoor.z) < 5;
+  const heldNearDoor = [];
+  const heldCells = [];
+  const nextWallUnit = (familySection) => {
+    if (!familySection && heldNearDoor.length > 0) return heldNearDoor.shift();
+    while (wallIdx < availableWallUnits.length) {
+      const unit = availableWallUnits[wallIdx++];
+      if (familySection && nearAdultDoor(unit)) {
+        heldNearDoor.push(unit);
+        continue;
+      }
+      return unit;
+    }
+    return familySection ? null : (heldNearDoor.shift() || null);
+  };
+
   const unitsPerRow = Math.floor((width - 4) / (UNIT_WIDTH + UNIT_GAP + 0.25));
   const rowStartX = cx - (unitsPerRow * (UNIT_WIDTH + UNIT_GAP + 0.25)) / 2 + UNIT_WIDTH / 2;
   const backStartZ = cz - depth / 2 + 2.6;
@@ -425,11 +449,11 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
     let signPlaced = false;
     const sItems = section.items;
     const accent = section.accent || HV_GOLD;
+    const isFamily = FAMILY_TITLES.has((section.title || '').toLowerCase());
 
     while (placed < sItems.length) {
-      if (wallIdx < availableWallUnits.length) {
-        // next wall unit
-        const unit = availableWallUnits[wallIdx++];
+      const unit = nextWallUnit(isFamily);
+      if (unit) {
         unit.accent = accent;
         addWallUnit(unit);
         const unitSlots = fillWallUnit(unit, sItems.slice(placed, placed + WALL_SLOTS));
@@ -448,18 +472,28 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
           signPlaced = true;
         }
       } else {
-        // gondola grid
-        if (unitCol >= unitsPerRow) {
-          unitCol = 0;
-          rowZ += UNIT_DEPTH + AISLE_WIDTH;
+        // gondola grid — family sections skip cells by the 18+ door
+        // too, and the held cells go to the next grown-up section
+        let cell = (!isFamily && heldCells.length > 0) ? heldCells.shift() : null;
+        while (!cell) {
+          if (unitCol >= unitsPerRow) {
+            unitCol = 0;
+            rowZ += UNIT_DEPTH + AISLE_WIDTH;
+          }
+          if (rowZ > maxZ && !opts.plainTitle) {
+            console.warn(`[shelf-layout] out of room space at "${section.title}"`);
+            return { slots, wallUnits, gondolaUnits, signs, collisionBoxes };
+          }
+          const x = rowStartX + unitCol * (UNIT_WIDTH + UNIT_GAP + 0.25);
+          unitCol++;
+          if (isFamily && adultDoor && Math.hypot(x - adultDoor.x, rowZ - adultDoor.z) < 5) {
+            heldCells.push({ x, z: rowZ });
+            continue;
+          }
+          cell = { x, z: rowZ };
         }
-        if (rowZ > maxZ && !opts.plainTitle) {
-          console.warn(`[shelf-layout] out of room space at "${section.title}"`);
-          return { slots, wallUnits, gondolaUnits, signs, collisionBoxes };
-        }
-        const x = rowStartX + unitCol * (UNIT_WIDTH + UNIT_GAP + 0.25);
-        addGondolaUnit(x, rowZ, accent);
-        const unitSlots = fillGondolaUnit(x, rowZ, sItems.slice(placed, placed + SLOTS_PER_UNIT));
+        addGondolaUnit(cell.x, cell.z, accent);
+        const unitSlots = fillGondolaUnit(cell.x, cell.z, sItems.slice(placed, placed + SLOTS_PER_UNIT));
         slots.push(...unitSlots);
         placed += unitSlots.length;
         // every gondola carries its section's topper, like a real store
@@ -467,10 +501,9 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
           text: section.title,
           style: 'topper',
           accent,
-          position: new THREE.Vector3(x, GONDOLA_HEIGHT, rowZ),
+          position: new THREE.Vector3(cell.x, GONDOLA_HEIGHT, cell.z),
         });
         signPlaced = true;
-        unitCol++;
       }
     }
   }

@@ -173,6 +173,10 @@ async function main() {
       left: tvItems.length > 0 ? [{ offset: doorZOffset, width: 3.5 }] : [],
       right: backroomItems.length > 0 ? [{ offset: backDoorZ, width: 2 }] : [],
     },
+    // family sections steer clear of the wall units by this door
+    ...(backroomItems.length > 0
+      ? { adultDoor: { x: dims.width / 2, z: backDoorZ } }
+      : {}),
   });
 
   // ---- tv room through the doorway ----
