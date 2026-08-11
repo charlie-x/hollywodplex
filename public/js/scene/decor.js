@@ -19,6 +19,9 @@ export function createWallPosters(scene, roomDims, items, count = 8, opts = {}) 
   // clear half-width kept free in the middle of the entrance wall,
   // e.g. for the glass storefront
   const frontClear = opts.frontClear ?? 0;
+  // keep-out zones along the entrance wall, e.g. behind zoltar
+  const frontExclude = opts.frontExclude ?? [];
+  const excluded = (x) => frontExclude.some(z => Math.abs(x - z.x) < z.halfWidth);
   const group = new THREE.Group();
   const loader = new THREE.TextureLoader();
 
@@ -44,11 +47,13 @@ export function createWallPosters(scene, roomDims, items, count = 8, opts = {}) 
     for (let i = 0; i < frontCount; i++) {
       const [a, b] = ranges[i % 2];
       const x = a + (Math.floor(i / 2) + 0.5) * ((b - a) / perSide);
+      if (excluded(x)) continue;
       spots.push({ x, y: EYE_Y, z: cz + depth / 2 - 0.18, ry: Math.PI });
     }
   } else {
     for (let i = 0; i < frontCount; i++) {
       const x = cx - width / 3 + (i + 0.5) * (width / 1.5 / frontCount);
+      if (excluded(x)) continue;
       spots.push({ x, y: EYE_Y, z: cz + depth / 2 - 0.18, ry: Math.PI });
     }
   }

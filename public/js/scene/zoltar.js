@@ -81,38 +81,96 @@ export function createZoltar(scene, position, rotationY = 0) {
   // ---- zoltar himself ----
   const skin = new THREE.MeshStandardMaterial({ color: '#c9935a', roughness: 0.7 });
   const robe = new THREE.MeshStandardMaterial({ color: '#8f1218', roughness: 0.6 });
+  const hair = new THREE.MeshStandardMaterial({ color: '#16161a', roughness: 0.9 });
+  const turbanMat = new THREE.MeshStandardMaterial({ color: '#d8b545', roughness: 0.5 });
   const zoltar = new THREE.Group();
+
+  // torso in the red robe with a gold vest front and shoulders
   const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.5, 12), robe);
   torso.position.y = 0.25;
   zoltar.add(torso);
+  const vest = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.42, 0.04), goldMat);
+  vest.position.set(0, 0.26, 0.24);
+  zoltar.add(vest);
+  for (const side of [-1, 1]) {
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), robe);
+    shoulder.position.set(side * 0.24, 0.44, 0);
+    zoltar.add(shoulder);
+  }
+
+  // arms: the right hand raised hovering over the crystal ball, the
+  // left resting by the ledge — the iconic pose
+  const armGeo = new THREE.CylinderGeometry(0.045, 0.055, 0.34, 8);
+  const rightArm = new THREE.Mesh(armGeo, robe);
+  rightArm.position.set(0.17, 0.38, 0.12);
+  rightArm.rotation.set(0.9, 0, -0.5);
+  zoltar.add(rightArm);
+  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), skin);
+  rightHand.scale.set(1, 0.6, 1.2);
+  rightHand.position.set(0.06, 0.48, 0.22);
+  zoltar.add(rightHand);
+  const leftArm = new THREE.Mesh(armGeo, robe);
+  leftArm.position.set(-0.2, 0.32, 0.08);
+  leftArm.rotation.set(0.5, 0, 0.5);
+  zoltar.add(leftArm);
+  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), skin);
+  leftHand.position.set(-0.13, 0.26, 0.17);
+  zoltar.add(leftHand);
+
   const head = new THREE.Group();
   const face = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), skin);
   head.add(face);
-  const beard = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), new THREE.MeshStandardMaterial({ color: '#16161a', roughness: 0.9 }));
+  const beard = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), hair);
   beard.scale.set(1, 0.9, 0.8);
   beard.position.set(0, -0.09, 0.04);
   head.add(beard);
-  const turban = new THREE.Mesh(
-    new THREE.SphereGeometry(0.15, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    robe,
-  );
-  turban.position.y = 0.05;
-  head.add(turban);
-  const jewel = new THREE.Mesh(
-    new THREE.SphereGeometry(0.03, 8, 6),
-    new THREE.MeshStandardMaterial({
-      color: GOLD, emissive: '#ffd25a', emissiveIntensity: 0.5, roughness: 0.3,
-    }),
-  );
-  jewel.position.set(0, 0.12, 0.12);
-  head.add(jewel);
-  // dark hollow eyes
+  // moustache draped over the beard line
+  for (const side of [-1, 1]) {
+    const tache = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), hair);
+    tache.scale.set(1.3, 0.45, 0.7);
+    tache.position.set(side * 0.035, -0.035, 0.115);
+    tache.rotation.z = -side * 0.35;
+    head.add(tache);
+  }
+  // brows over the hollow eyes
   const eyeMat = new THREE.MeshStandardMaterial({ color: '#0a0a0c', roughness: 0.4 });
   for (const x of [-0.05, 0.05]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), eyeMat);
     eye.position.set(x, 0.02, 0.115);
     head.add(eye);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.012, 0.015), hair);
+    brow.position.set(x, 0.055, 0.12);
+    brow.rotation.z = x < 0 ? -0.25 : 0.25; // stern
+    head.add(brow);
   }
+  // gold hoop earrings
+  for (const side of [-1, 1]) {
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 12), goldMat);
+    hoop.position.set(side * 0.125, -0.03, 0.02);
+    head.add(hoop);
+  }
+
+  // gold wrapped turban with a band and the red jewel
+  const turban = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    turbanMat,
+  );
+  turban.scale.set(1, 1.25, 1);
+  turban.position.y = 0.04;
+  head.add(turban);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.022, 8, 16), robe);
+  band.rotation.x = Math.PI / 2;
+  band.position.y = 0.06;
+  head.add(band);
+  const jewel = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 8, 6),
+    new THREE.MeshStandardMaterial({
+      color: '#d42027', emissive: '#ff4455', emissiveIntensity: 0.5, roughness: 0.3,
+    }),
+  );
+  jewel.position.set(0, 0.09, 0.145);
+  head.add(jewel);
+
   head.position.y = 0.6;
   zoltar.add(head);
 
@@ -135,6 +193,22 @@ export function createZoltar(scene, position, rotationY = 0) {
   const ballLight = new THREE.PointLight('#7fb8ff', 0, 2.5, 2);
   ballLight.position.set(0, 1.42, 0.2);
   group.add(ballLight);
+
+  // warm case lighting so zoltar reads behind the tinted glass
+  const caseLight = new THREE.PointLight('#ffd9a0', 1.4, 1.6, 2);
+  caseLight.position.set(0, 1.8, 0.15);
+  group.add(caseLight);
+
+  // coin plate under the button
+  const coinPlate = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.02), goldMat);
+  coinPlate.position.set(0.28, 0.86, 0.36);
+  group.add(coinPlate);
+  const coinSlot = new THREE.Mesh(
+    new THREE.BoxGeometry(0.025, 0.06, 0.03),
+    new THREE.MeshStandardMaterial({ color: '#0a0a0c', roughness: 0.9 }),
+  );
+  coinSlot.position.set(0.28, 0.86, 0.365);
+  group.add(coinSlot);
 
   // ---- header sign ----
   const sign = new THREE.Mesh(
@@ -213,6 +287,18 @@ function signTexture() {
   ctx.fillStyle = '#e8d8a8';
   ctx.font = 'italic 30px Georgia, serif';
   ctx.fillText('speaks in movies', 256, 130);
+  // marquee bulbs around the border
+  for (let x = 24; x < 512; x += 44) {
+    for (const y of [20, 140]) {
+      ctx.fillStyle = '#fff2c9';
+      ctx.shadowColor = '#ffd25a';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.shadowBlur = 0;
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;

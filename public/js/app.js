@@ -300,8 +300,11 @@ async function main() {
   const posterPicks = [...shopItems]
     .filter(i => releaseDate(i) > 0)
     .sort((a, b) => releaseDate(b) - releaseDate(a));
-  createWallPosters(sceneManager.scene, movieRoom.dimensions, posterPicks, 20,
-    { frontClear: STOREFRONT_WIDTH / 2 + 1.2 });
+  createWallPosters(sceneManager.scene, movieRoom.dimensions, posterPicks, 20, {
+    frontClear: STOREFRONT_WIDTH / 2 + 1.2,
+    // zoltar the great shares his wall with no one
+    frontExclude: [{ x: zoltar.group.position.x, halfWidth: 1.4 }],
+  });
 
   // entrance promo dressing: a-frames with the newest releases,
   // popcorn and soda by the window, and the 3-d glasses standee
