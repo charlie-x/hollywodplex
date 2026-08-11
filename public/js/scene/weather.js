@@ -6,6 +6,10 @@
 
 import * as THREE from 'three';
 import { STOREFRONT_WIDTH } from './storefront.js';
+import {
+  softFogTexture, creatureTextures, splatTextures, crackTextures,
+  gunkTrailTexture, makeTentacle,
+} from './weather-art.js';
 
 const FIRST_WAIT = 300;        // five minutes before the first event
 const SIEGE_MIN = 60;          // how long the fog sits at full thickness
@@ -14,9 +18,10 @@ const ROLL_IN = 15;
 const ROLL_OUT = 20;
 const MAX_CRACKS = 4;
 
-export function createWeatherEvent(scene, dims) {
+export function createWeatherEvent(scene, dims, opts = {}) {
   const cx = dims.cx ?? 0;
   const wallZ = (dims.cz ?? 0) + dims.depth / 2;
+  const cars = opts.cars || [];
 
   // ---- layered fog banks across the car park ----
   // far banks thicken first so the fog reads as rolling towards the
@@ -24,10 +29,10 @@ export function createWeatherEvent(scene, dims) {
   const banks = [];
   const fogTexture = softFogTexture();
   for (const [dz, maxOpacity, delay] of [
-    [14.6, 0.95, 0.0],  // whites out the strip mall first
+    [14.6, 0.95, 0.0],
     [9.0, 0.8, 0.25],
     [5.0, 0.65, 0.5],
-    [1.6, 0.5, 0.75],   // finally right up against the pavement
+    [1.6, 0.5, 0.75],
   ]) {
     const bank = new THREE.Mesh(
       new THREE.PlaneGeometry(STOREFRONT_WIDTH + 22, 7),
@@ -37,51 +42,238 @@ export function createWeatherEvent(scene, dims) {
       }),
     );
     bank.position.set(cx, 2.4, wallZ + dz);
-    bank.rotation.y = Math.PI; // faces the store
+    bank.rotation.y = Math.PI;
     bank.visible = false;
     scene.add(bank);
     banks.push({ mesh: bank, maxOpacity, delay });
   }
 
-  // a dark shape that drifts through the fog during the siege
+  // ---- the things in the fog: varied silhouettes drifting past ----
+  const shapeTexs = creatureTextures();
   const shape = new THREE.Mesh(
     new THREE.PlaneGeometry(3.4, 2.2),
     new THREE.MeshBasicMaterial({
-      map: creatureTexture(), color: '#14161c', transparent: true, opacity: 0,
+      map: shapeTexs[0], color: '#14161c', transparent: true, opacity: 0,
       depthWrite: false,
     }),
   );
-  shape.position.set(cx, 1.6, wallZ + 3.2);
   shape.rotation.y = Math.PI;
   shape.visible = false;
   scene.add(shape);
+  let pass = null; // one crossing: direction, depth, size, speed all vary
+
+  function startPass() {
+    pass = {
+      t: 0,
+      dur: 4.5 + Math.random() * 5,
+      dir: Math.random() < 0.5 ? 1 : -1,
+      z: 2.5 + Math.random() * 5.5,
+      y: 1.2 + Math.random() * 1.5,
+      scale: 0.7 + Math.random() * 1.1,
+      flip: Math.random() < 0.5,
+    };
+    shape.material.map = shapeTexs[Math.floor(Math.random() * shapeTexs.length)];
+    shape.material.needsUpdate = true;
+    shape.visible = true;
+  }
+
+  function updatePass(dt) {
+    pass.t += dt;
+    const f = pass.t / pass.dur;
+    const span = STOREFRONT_WIDTH + 8;
+    shape.position.set(
+      cx + pass.dir * (f - 0.5) * span,
+      pass.y + 0.18 * Math.sin(pass.t * 1.7),
+      wallZ + pass.z,
+    );
+    shape.scale.set(pass.scale * (pass.flip ? -1 : 1), pass.scale, 1);
+    // deeper shapes read dimmer through more fog
+    const peak = Math.max(0.2, 0.55 - (pass.z - 2.5) * 0.045);
+    shape.material.opacity = peak * Math.sin(Math.min(1, f) * Math.PI);
+    if (f >= 1) {
+      pass = null;
+      shape.visible = false;
+    }
+  }
 
   // ---- crack decals on the glass, each with the bug that made it ----
-  const crackTexture = cracksTexture();
-  const splatTexture = bugSplatTexture();
+  const crackTexs = crackTextures();
+  const splatTexs = splatTextures();
+  const trailTex = gunkTrailTexture();
   const cracks = [];
   for (let i = 0; i < MAX_CRACKS; i++) {
     const crack = new THREE.Mesh(
       new THREE.PlaneGeometry(0.65, 0.65),
       new THREE.MeshBasicMaterial({
-        map: crackTexture, transparent: true, opacity: 0,
+        map: crackTexs[0], transparent: true, opacity: 0,
         depthWrite: false, side: THREE.DoubleSide,
       }),
     );
-    crack.position.set(0, 0, wallZ - 0.03);
     crack.visible = false;
     scene.add(crack);
     const splat = new THREE.Mesh(
       new THREE.PlaneGeometry(0.45, 0.45),
       new THREE.MeshBasicMaterial({
-        map: splatTexture, transparent: true, opacity: 0,
+        map: splatTexs[0], transparent: true, opacity: 0,
         depthWrite: false, side: THREE.DoubleSide,
       }),
     );
-    splat.position.set(0, 0, wallZ - 0.025);
     splat.visible = false;
     scene.add(splat);
-    cracks.push({ mesh: crack, splat, hasSplat: false, age: -1 });
+    // the smear left behind as the bug loses its grip and slides
+    const trail = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.28, 1),
+      new THREE.MeshBasicMaterial({
+        map: trailTex, transparent: true, opacity: 0,
+        depthWrite: false, side: THREE.DoubleSide,
+      }),
+    );
+    trail.visible = false;
+    scene.add(trail);
+    cracks.push({
+      mesh: crack, splat, trail, hasSplat: false, age: -1,
+      size: 1, splatSize: 1, startY: 0, slideY: 0, slideSpeed: 0, slideDelay: 0,
+    });
+  }
+
+  function thump() {
+    const free = cracks.find(c => c.age < 0);
+    if (!free) return;
+    free.age = 0;
+    free.size = 0.55 + Math.random() * 0.8; // some taps, some slams
+    free.mesh.material.map = crackTexs[Math.floor(Math.random() * crackTexs.length)];
+    free.mesh.material.needsUpdate = true;
+    free.mesh.visible = true;
+    const hx = cx + (Math.random() - 0.5) * (STOREFRONT_WIDTH - 1.6);
+    const hy = 0.9 + Math.random() * 1.6;
+    free.mesh.position.set(hx, hy, wallZ - 0.03);
+    free.mesh.rotation.z = Math.random() * Math.PI * 2;
+    // most impacts leave the bug that made them smeared on the glass,
+    // and gravity gets them all eventually
+    free.hasSplat = Math.random() < 0.75;
+    if (free.hasSplat) {
+      free.splatSize = 0.7 + Math.random() * 0.8;
+      free.startY = hy + (Math.random() - 0.5) * 0.12;
+      free.slideY = 0;
+      free.slideSpeed = 0.035 + Math.random() * 0.05;
+      free.slideDelay = 0.5 + Math.random() * 1.2;
+      free.splat.material.map = splatTexs[Math.floor(Math.random() * splatTexs.length)];
+      free.splat.material.needsUpdate = true;
+      free.splat.visible = true;
+      free.splat.position.set(
+        hx + (Math.random() - 0.5) * 0.12,
+        free.startY,
+        wallZ - 0.025,
+      );
+      free.splat.rotation.z = Math.random() * Math.PI * 2;
+    }
+  }
+
+  // ---- something in the fog takes a car ----
+  const tentacle = makeTentacle();
+  tentacle.mesh.visible = false;
+  scene.add(tentacle.mesh);
+  let grab = null;
+  let grabPlanned = false;
+  let grabAt = 0;
+  let siegeT = 0;
+  const root = new THREE.Vector3();
+  const tip = new THREE.Vector3();
+  const mid1 = new THREE.Vector3();
+  const mid2 = new THREE.Vector3();
+
+  function beginGrab() {
+    const car = cars[Math.floor(Math.random() * cars.length)];
+    grab = {
+      car,
+      home: car.position.clone(),
+      rootX: car.position.x + (Math.random() < 0.5 ? -1 : 1) * (2.5 + Math.random() * 2),
+      t: 0,
+      phase: 'emerge',
+      wobble: Math.random() * 10,
+    };
+    tentacle.mesh.visible = true;
+  }
+
+  function layTentacle(frac) {
+    const g = grab;
+    root.set(g.rootX, 5.4, wallZ + 12.5);
+    // arcing overhead: high near the root, swooping down to the tip
+    mid1.lerpVectors(root, tip, 0.35);
+    mid1.y += 1.8 + 0.3 * Math.sin(g.t * 1.3);
+    mid2.lerpVectors(root, tip, 0.72);
+    mid2.y += 0.6;
+    mid2.x += 0.4 * Math.sin(g.t * 1.8);
+    tentacle.reshape(root, mid1, mid2, tip, frac, g.wobble + g.t * 3);
+  }
+
+  function updateGrab(dt) {
+    const g = grab;
+    g.t += dt;
+    const car = g.car;
+    const roofY = 1.1;
+
+    if (g.phase === 'emerge') {
+      // it comes out of the fog, reaching over the car
+      const p = Math.min(1, g.t / 1.6);
+      tip.set(g.home.x, 2.3, g.home.z + 0.4);
+      layTentacle(1 - (1 - p) * (1 - p)); // ease out
+      if (g.t >= 1.6) { g.phase = 'probe'; g.t = 0; }
+    } else if (g.phase === 'probe') {
+      // circling over the roof, feeling for a grip
+      tip.set(
+        g.home.x + 0.35 * Math.sin(g.t * 4),
+        2.0 - g.t * 0.5,
+        g.home.z + 0.35 * Math.cos(g.t * 4),
+      );
+      layTentacle(1);
+      if (g.t >= 1.4) { g.phase = 'seize'; g.t = 0; }
+    } else if (g.phase === 'seize') {
+      // the snap down onto the roof; the car jolts on its springs
+      const p = Math.min(1, g.t / 0.4);
+      tip.set(g.home.x, 2.0 - (2.0 - roofY) * p * p, g.home.z);
+      car.position.y = g.home.y + 0.05 * Math.sin(p * Math.PI);
+      car.updateMatrix();
+      layTentacle(1);
+      if (g.t >= 0.4) { g.phase = 'drag'; g.t = 0; }
+    } else if (g.phase === 'drag') {
+      // hauled backwards into the fog, nose up, struggling on its
+      // suspension, accelerating as the thing commits
+      const q = Math.min(1, g.t / 4.5);
+      const e = q * q;
+      car.position.set(
+        g.home.x + (g.rootX - g.home.x) * 0.5 * e,
+        g.home.y + 0.12 * Math.sin(Math.min(1, q * 3) * Math.PI),
+        g.home.z + e * 10.5,
+      );
+      car.rotation.x = 0.16 * Math.sin(Math.min(1, q * 2) * Math.PI / 2);
+      car.rotation.z = 0.05 * Math.sin(g.t * 25) * (1 - q);
+      car.updateMatrix();
+      tip.set(car.position.x, roofY + 0.05, car.position.z);
+      layTentacle(1);
+      if (q >= 1) {
+        g.phase = 'vanish';
+        g.t = 0;
+        car.visible = false;
+      }
+    } else if (g.phase === 'vanish') {
+      // the tentacle whips back into the murk with its prize
+      layTentacle(1 - g.t / 0.7);
+      if (g.t >= 0.7) {
+        g.phase = 'done';
+        tentacle.mesh.visible = false;
+      }
+    }
+  }
+
+  function resetGrab() {
+    if (!grab) return;
+    grab.car.visible = true;
+    grab.car.position.copy(grab.home);
+    grab.car.rotation.set(0, 0, 0);
+    grab.car.updateMatrix();
+    tentacle.mesh.visible = false;
+    grab = null;
   }
 
   // ---- event state machine ----
@@ -89,61 +281,54 @@ export function createWeatherEvent(scene, dims) {
   let timer = FIRST_WAIT;
   let siegeLeft = 0;
   let thumpIn = 0;
-  let shapeT = -1;
-  let fogLevel = 0; // 0 clear .. 1 full
+  let fogLevel = 0;
 
   function startEvent() {
     state = 'rollIn';
     timer = ROLL_IN;
     siegeLeft = SIEGE_MIN + Math.random() * (SIEGE_MAX - SIEGE_MIN);
     thumpIn = 6 + Math.random() * 6;
+    siegeT = 0;
+    grabPlanned = cars.length > 0 && Math.random() < 0.7;
+    grabAt = 8 + Math.random() * (siegeLeft - 20);
     for (const b of banks) b.mesh.visible = true;
-  }
-
-  function thump() {
-    const free = cracks.find(c => c.age < 0);
-    if (!free) return;
-    free.age = 0;
-    free.mesh.visible = true;
-    // somewhere on the glass, away from the very edges
-    const hx = cx + (Math.random() - 0.5) * (STOREFRONT_WIDTH - 1.6);
-    const hy = 0.9 + Math.random() * 1.6;
-    free.mesh.position.set(hx, hy, wallZ - 0.03);
-    free.mesh.rotation.z = Math.random() * Math.PI * 2;
-    // most impacts leave the bug that made them smeared on the glass
-    free.hasSplat = Math.random() < 0.75;
-    if (free.hasSplat) {
-      free.splat.visible = true;
-      free.splat.position.set(
-        hx + (Math.random() - 0.5) * 0.12,
-        hy + (Math.random() - 0.5) * 0.12,
-        wallZ - 0.025,
-      );
-      free.splat.rotation.z = Math.random() * Math.PI * 2;
-    }
   }
 
   function applyFog() {
     for (const b of banks) {
-      // each bank waits for its share of the roll before thickening
       const local = Math.max(0, Math.min(1, (fogLevel - b.delay) / (1 - b.delay)));
       b.mesh.material.opacity = b.maxOpacity * local;
     }
   }
 
   function update(dt) {
-    // cracks pop in fast, then linger; the splat lands with them
+    // cracks pop in fast, then linger; the splat lands with them and
+    // then slowly loses its grip, sliding down and smearing a trail
     for (const c of cracks) {
       if (c.age < 0) continue;
       c.age += dt;
       const pop = Math.min(1, c.age / 0.12);
-      c.mesh.scale.setScalar(0.3 + 0.7 * pop);
+      c.mesh.scale.setScalar(c.size * (0.3 + 0.7 * pop));
       c.mesh.material.opacity = 0.85 * pop * Math.min(1, fogLevel * 2);
       if (c.hasSplat) {
-        c.splat.scale.setScalar(0.4 + 0.6 * pop);
+        c.splat.scale.setScalar(c.splatSize * (0.4 + 0.6 * pop));
         c.splat.material.opacity = 0.9 * pop * Math.min(1, fogLevel * 2);
+        if (c.age > c.slideDelay) {
+          const maxSlide = Math.max(0, c.startY - 0.35); // stops above the sill
+          c.slideY = Math.min(maxSlide, c.slideY + c.slideSpeed * dt);
+          c.splat.position.y = c.startY - c.slideY;
+          c.splat.rotation.z += dt * 0.06; // lazily turning as it slips
+          if (c.slideY > 0.04) {
+            c.trail.visible = true;
+            c.trail.position.set(c.splat.position.x, c.startY - c.slideY / 2, wallZ - 0.02);
+            c.trail.scale.set(c.splatSize * 0.55, c.slideY + 0.08, 1);
+            c.trail.material.opacity = 0.6 * Math.min(1, fogLevel * 2);
+          }
+        }
       }
     }
+
+    if (grab && grab.phase !== 'done') updateGrab(dt);
 
     switch (state) {
       case 'idle':
@@ -163,26 +348,15 @@ export function createWeatherEvent(scene, dims) {
 
       case 'siege':
         siegeLeft -= dt;
+        siegeT += dt;
         thumpIn -= dt;
         if (thumpIn <= 0) {
           thump();
           thumpIn = 8 + Math.random() * 10;
         }
-        // the shape drifts past now and then
-        if (shapeT < 0 && Math.random() < dt * 0.08) {
-          shapeT = 0;
-          shape.visible = true;
-        }
-        if (shapeT >= 0) {
-          shapeT += dt;
-          const drift = shapeT / 7;
-          shape.position.x = cx + (drift - 0.5) * (STOREFRONT_WIDTH + 6);
-          shape.material.opacity = 0.5 * Math.sin(Math.min(1, drift) * Math.PI);
-          if (drift >= 1) {
-            shapeT = -1;
-            shape.visible = false;
-          }
-        }
+        if (grabPlanned && !grab && siegeT >= grabAt) beginGrab();
+        if (!pass && Math.random() < dt * 0.08) startPass();
+        if (pass) updatePass(dt);
         if (siegeLeft <= 0) {
           state = 'rollOut';
           timer = ROLL_OUT;
@@ -193,11 +367,15 @@ export function createWeatherEvent(scene, dims) {
         timer -= dt;
         fogLevel = Math.max(0, timer / ROLL_OUT);
         applyFog();
+        if (pass) updatePass(dt);
         // the cracks mend as the weather lets go of the glass
         for (const c of cracks) {
           if (c.age >= 0) {
             c.mesh.material.opacity = Math.min(c.mesh.material.opacity, fogLevel);
-            if (c.hasSplat) c.splat.material.opacity = Math.min(c.splat.material.opacity, fogLevel);
+            if (c.hasSplat) {
+              c.splat.material.opacity = Math.min(c.splat.material.opacity, fogLevel);
+              c.trail.material.opacity = Math.min(c.trail.material.opacity, fogLevel * 0.6);
+            }
           }
         }
         if (timer <= 0) {
@@ -207,10 +385,12 @@ export function createWeatherEvent(scene, dims) {
             c.age = -1;
             c.mesh.visible = false;
             c.splat.visible = false;
+            c.trail.visible = false;
             c.hasSplat = false;
           }
           shape.visible = false;
-          shapeT = -1;
+          pass = null;
+          resetGrab();
           state = 'idle';
           timer = 360 + Math.random() * 360; // it always comes back
         }
@@ -218,163 +398,10 @@ export function createWeatherEvent(scene, dims) {
     }
   }
 
-  return { update };
-}
-
-/*
- * soft-edged fog: bright noise blobs fading to nothing at the top so
- * the banks have no hard rectangle edge against the sky.
- */
-function softFogTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 512, 256);
-  for (let i = 0; i < 90; i++) {
-    const x = (i * 73) % 512;
-    const y = 60 + ((i * 41) % 180);
-    const r = 40 + (i * 17) % 70;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(255,255,255,0.30)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-/*
- * a vague many-limbed silhouette — never clearly seen, as it should be.
- */
-function creatureTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 160;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 160);
-  ctx.fillStyle = 'rgba(0,0,0,0.9)';
-  ctx.beginPath();
-  ctx.ellipse(128, 90, 70, 42, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // trailing limbs
-  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-  ctx.lineWidth = 9;
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 6; i++) {
-    ctx.beginPath();
-    ctx.moveTo(90 + i * 18, 110);
-    ctx.quadraticCurveTo(80 + i * 20, 150, 60 + i * 26, 158);
-    ctx.stroke();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
-}
-
-/*
- * an alien insect smeared on the glass: greenish ichor spatter with
- * the segmented body and bent legs still in the middle of it.
- */
-function bugSplatTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 256);
-
-  // ichor blob with spatter drops flung outward
-  ctx.fillStyle = 'rgba(150,168,60,0.75)';
-  ctx.beginPath();
-  for (let i = 0; i <= 20; i++) {
-    const a = (i / 20) * Math.PI * 2;
-    const r = 52 + ((i * 37) % 5) * 8;
-    const px = 128 + Math.cos(a) * r;
-    const py = 128 + Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2 + 0.26;
-    const d = 78 + (i * 23) % 34;
-    ctx.beginPath();
-    ctx.arc(128 + Math.cos(a) * d, 128 + Math.sin(a) * d, 3 + (i % 3) * 2.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // darker core where it hit hardest
-  ctx.fillStyle = 'rgba(96,110,34,0.8)';
-  ctx.beginPath();
-  ctx.ellipse(128, 128, 30, 24, 0.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  // the remains: segmented body and bent legs
-  ctx.fillStyle = 'rgba(38,42,20,0.9)';
-  for (const [sx, r] of [[-14, 12], [2, 10], [15, 8]]) {
-    ctx.beginPath();
-    ctx.ellipse(128 + sx, 128, r, r * 0.7, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = 'rgba(38,42,20,0.85)';
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.moveTo(120 + i * 12, 128 + side * 8);
-      ctx.lineTo(112 + i * 12, 128 + side * 26);
-      ctx.lineTo(120 + i * 12, 128 + side * 40);
-      ctx.stroke();
-    }
+  // bring the next event forward — for those who cannot wait
+  function trigger() {
+    if (state === 'idle') timer = Math.min(timer, 0.5);
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-/*
- * radial impact crack, like a stone into a windscreen.
- */
-function cracksTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 256);
-  ctx.strokeStyle = 'rgba(235,240,245,0.9)';
-  ctx.lineCap = 'round';
-  // jagged radial legs
-  for (let i = 0; i < 11; i++) {
-    const a = (i / 11) * Math.PI * 2 + (i % 3) * 0.15;
-    let x = 128, y = 128;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    const legLen = 60 + (i * 29) % 55;
-    const steps = 4;
-    for (let s = 1; s <= steps; s++) {
-      const wobble = ((i * 13 + s * 7) % 9 - 4) * 3;
-      x = 128 + Math.cos(a) * (legLen * s / steps) + wobble;
-      y = 128 + Math.sin(a) * (legLen * s / steps) - wobble;
-      ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-  // concentric shatter rings near the impact point
-  ctx.lineWidth = 1.5;
-  for (const r of [14, 26]) {
-    ctx.beginPath();
-    ctx.arc(128, 128, r, 0.3, Math.PI * 2 - 0.4);
-    ctx.stroke();
-  }
-  // bright impact core
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.beginPath();
-  ctx.arc(128, 128, 5, 0, Math.PI * 2);
-  ctx.fill();
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
+  return { update, trigger };
 }

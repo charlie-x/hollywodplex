@@ -108,7 +108,7 @@ export function createStorefront(scene, dims) {
     new THREE.Vector3(cx + half, GLASS_TOP, wallZ + 0.15),
   )];
 
-  return { group, collisionBoxes, update };
+  return { group, collisionBoxes, update, cars: outside.cars };
 }
 
 /*
@@ -146,8 +146,11 @@ function buildCarPark(group, cx, wallZ) {
   for (const g of lines) g.dispose();
 
   // two parked cars, nose in towards the glass
-  group.add(makeCar('#6b2130', cx - 4.05, wallZ + 4.7));
-  group.add(makeCar('#274a63', cx + 2.75, wallZ + 4.9));
+  const cars = [
+    makeCar('#6b2130', cx - 4.05, wallZ + 4.7),
+    makeCar('#274a63', cx + 2.75, wallZ + 4.9),
+  ];
+  for (const car of cars) group.add(car);
 
   // street lamp with a warm sodium pool
   const lamp = new THREE.Group();
@@ -210,7 +213,7 @@ function buildCarPark(group, cx, wallZ) {
   ring.position.set(cx - 5.8, 5.55, wallZ + 15.5);
   group.add(ring);
 
-  return { brokenB: brandys.brokenMat };
+  return { brokenB: brandys.brokenMat, cars };
 }
 
 /*

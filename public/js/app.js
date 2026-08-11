@@ -328,7 +328,14 @@ async function main() {
   const dust = createDustParticles(sceneManager.scene, movieRoom.dimensions);
 
   // the car park has its own weather. sometimes.
-  const weather = createWeatherEvent(sceneManager.scene, dims);
+  const weather = createWeatherEvent(sceneManager.scene, dims, { cars: storefront.cars });
+
+  // n hurries the next weather along, for the impatient
+  document.addEventListener('keydown', (e) => {
+    const tag = e.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.code === 'KeyN') weather.trigger();
+  });
   store.setLoadingProgress(0.9);
 
   // ---- controls ----
