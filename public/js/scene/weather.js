@@ -37,18 +37,22 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   const banks = [];
   const baseFog = softFogTexture();
   let airT = 0; // shared clock for drift and breathing
+  // the far bank stays a metre clear of the strip mall face, or the
+  // two coplanar surfaces shimmer against each other
   for (const [dz, maxOpacity, delay, drift] of [
-    [15.2, 0.98, 0.0, 0.004],
-    [11.0, 0.9, 0.2, -0.007],
-    [7.6, 0.82, 0.4, 0.01],
-    [4.6, 0.72, 0.55, -0.013],
-    [2.4, 0.6, 0.7, 0.017],
-    [0.9, 0.45, 0.82, 0.022], // right up against the pavement
+    [14.2, 1.0, 0.0, 0.1],
+    [11.0, 0.95, 0.2, -0.16],
+    [7.6, 0.9, 0.4, 0.24],
+    [4.6, 0.85, 0.55, -0.32],
+    [2.4, 0.75, 0.7, 0.42],
+    [0.9, 0.6, 0.82, 0.55], // right up against the pavement
   ]) {
     const tex = baseFog.clone();
     tex.needsUpdate = true;
+    // wider with depth, so sightlines through the glass never find
+    // an edge no matter the viewing angle
     const bank = new THREE.Mesh(
-      new THREE.PlaneGeometry(STOREFRONT_WIDTH + 22, 7),
+      new THREE.PlaneGeometry(STOREFRONT_WIDTH + 20 + dz * 1.6, 7),
       new THREE.MeshBasicMaterial({
         map: tex, color: '#c4c6ca', transparent: true, opacity: 0,
         depthWrite: false,
@@ -391,18 +395,23 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       const local = Math.max(0, Math.min(1, (fogLevel - b.delay) / (1 - b.delay)));
       // gentle breathing so the wall of fog never sits perfectly still
       b.mesh.material.opacity = b.maxOpacity * local
-        * (0.92 + 0.08 * Math.sin(airT * 0.35 + b.phase));
+        * (0.95 + 0.05 * Math.sin(airT * 0.35 + b.phase));
     }
-    groundMist.material.opacity = 0.5 * fogLevel
-      * (0.9 + 0.1 * Math.sin(airT * 0.28));
+    groundMist.material.opacity = 0.6 * fogLevel
+      * (0.92 + 0.08 * Math.sin(airT * 0.28));
   }
 
   function update(dt) {
     airT += dt;
     // the banks drift sideways at different speeds for parallax
     if (state !== 'idle') {
-      for (const b of banks) b.mesh.material.map.offset.x += b.drift * dt;
-      groundMist.material.map.offset.x += 0.006 * dt;
+      // banks wander bodily rather than scrolling their textures, so
+      // the soft baked edges stay at the edges
+      for (const b of banks) {
+        b.mesh.position.x = cx + Math.sin(airT * Math.abs(b.drift) + b.phase)
+          * 1.7 * Math.sign(b.drift);
+      }
+      groundMist.position.x = cx + Math.sin(airT * 0.21) * 1.2;
     }
 
     // the street lamp struggles while the weather is in

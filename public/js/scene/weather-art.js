@@ -50,11 +50,21 @@ export function softFogTexture() {
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
+  // fade the sides out too — a bank's vertical edge must never be
+  // seen as a hard line hanging in the air
+  for (const [from, to] of [[0, 96], [512, 416]]) {
+    const g = ctx.createLinearGradient(from, 0, to, 0);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(Math.min(from, to), 0, 96, 256);
+  }
   ctx.globalCompositeOperation = 'source-over';
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping; // the banks drift sideways
+  // no wrapping: the banks drift by position, so the baked edge
+  // fades stay put instead of scrolling through the middle
   return texture;
 }
 
@@ -80,29 +90,31 @@ function tentacle() {
   const { canvas, ctx } = shapeCanvas();
   ctx.strokeStyle = 'rgba(0,0,0,0.88)';
   ctx.lineCap = 'round';
-  // one thick tapering arc sweeping across the frame
-  const spine = [[10, 150], [70, 60], [150, 30], [246, 55]];
+  // rearing pose, drawn frontally: an s-coil rising from the bottom
+  // of the frame with the tip curling over at the top — a side-view
+  // arc looks wrong drifting head-on at the viewer
+  const spine = [[126, 162], [88, 112], [156, 64], [108, 18]];
+  const ctrl = [[34, 8], [-28, 0], [20, 2]]; // control point offsets
   for (let s = 0; s < 3; s++) {
-    ctx.lineWidth = 26 - s * 8;
+    ctx.lineWidth = 30 - s * 9;
     ctx.beginPath();
     ctx.moveTo(spine[s][0], spine[s][1]);
     ctx.quadraticCurveTo(
-      (spine[s][0] + spine[s + 1][0]) / 2 + 12,
-      (spine[s][1] + spine[s + 1][1]) / 2 - 18,
+      (spine[s][0] + spine[s + 1][0]) / 2 + ctrl[s][0],
+      (spine[s][1] + spine[s + 1][1]) / 2 + ctrl[s][1],
       spine[s + 1][0], spine[s + 1][1],
     );
     ctx.stroke();
   }
-  // sucker bumps riding the underside of the actual curve — sampled
-  // along each bezier segment and offset down its normal, so they
-  // cling to the limb instead of marching off on a straight line
+  // sucker bumps riding one flank of the actual curve — sampled
+  // along each bezier segment and offset down its normal
   ctx.fillStyle = 'rgba(0,0,0,0.8)';
   for (let s = 0; s < 3; s++) {
     const [x0, y0] = spine[s];
     const [x1, y1] = spine[s + 1];
-    const cxp = (x0 + x1) / 2 + 12;
-    const cyp = (y0 + y1) / 2 - 18;
-    const half = (26 - s * 8) / 2;
+    const cxp = (x0 + x1) / 2 + ctrl[s][0];
+    const cyp = (y0 + y1) / 2 + ctrl[s][1];
+    const half = (30 - s * 9) / 2;
     for (const t of [0.2, 0.45, 0.7, 0.9]) {
       const mt = 1 - t;
       const px = mt * mt * x0 + 2 * mt * t * cxp + t * t * x1;
@@ -112,8 +124,8 @@ function tentacle() {
       const len = Math.hypot(tx, ty) || 1;
       let nx = ty / len;
       let ny = -tx / len;
-      if (ny < 0) { nx = -nx; ny = -ny; } // hang below, not above
-      const r = 6.5 - s * 1.5;
+      if (nx < 0) { nx = -nx; ny = -ny; } // keep to one flank
+      const r = 7 - s * 1.5;
       ctx.beginPath();
       ctx.arc(px + nx * (half + r * 0.6), py + ny * (half + r * 0.6), r, 0, Math.PI * 2);
       ctx.fill();
