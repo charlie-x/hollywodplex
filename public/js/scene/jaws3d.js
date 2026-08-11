@@ -127,10 +127,14 @@ function makeShark() {
   shark.add(head);
 
   // dark concave maw under the snout, seen from inside
-  const mawGeo = new THREE.SphereGeometry(0.2, 12, 8);
-  mawGeo.scale(1.1, 0.8, 0.8);
+  // a hemisphere bowl, open rim facing forward and apex buried in the
+  // head, so from outside it is only ever a dark hollow behind the
+  // teeth — a full sphere here pokes through the jaw as a brown blob
+  const mawGeo = new THREE.SphereGeometry(0.1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  mawGeo.rotateX(-Math.PI / 2); // dome apex points backward
+  mawGeo.scale(1.1, 0.7, 1);
   const mawMesh = new THREE.Mesh(mawGeo, maw);
-  mawMesh.position.set(0, -0.12, 0.42);
+  mawMesh.position.set(0, -0.11, 0.32);
   shark.add(mawMesh);
 
   // upper gum: a horizontal horseshoe hugging the mouth roof, bulge
