@@ -114,3 +114,14 @@ if you want remote access, put it behind a vpn (wireguard, tailscale)
 instead. the image and stream proxies only accept plex-relative
 paths, so the plex token itself cannot be redirected to other hosts
 and never reaches the browser.
+
+
+
+<img width="1649" height="963" alt="image" src="https://github.com/user-attachments/assets/d509994d-90e6-40ae-ab3a-8f729c7ce9df" />
+
+
+<img width="1605" height="916" alt="image" src="https://github.com/user-attachments/assets/c1f8e8db-9d1e-4018-a341-ab25fe671b05" />
+
+<img width="1515" height="955" alt="image" src="https://github.com/user-attachments/assets/fc595545-d5de-4509-8810-bb8cd2c19cd0" />
+
+
