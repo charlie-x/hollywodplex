@@ -160,13 +160,18 @@ export class CaseRaycaster {
   }
 
   #onClick() {
-    if (!store.isPointerLocked) return;
+    // gamepad mode has no pointer lock but still clicks via the a button
+    if (!store.isPointerLocked && !store.gamepadActive) return;
     if (!this.hovered) return;
     if (store.selectedItem) return;
 
     const item = this.hovered.item;
     if (item?.isKiosk) {
       store.emit('search-toggle');
+      return;
+    }
+    if (item?.isScanButton) {
+      store.emit('taste-scan');
       return;
     }
     if (item && item.ratingKey) {

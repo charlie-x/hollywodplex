@@ -98,6 +98,12 @@ export function createHUD() {
       hoverCard.style.display = 'flex';
       return;
     }
+    if (item.isScanButton) {
+      hoverTitle.textContent = 'taste scanner';
+      hoverMeta.textContent = 'press for a fresh batch of recommendations';
+      hoverCard.style.display = 'flex';
+      return;
+    }
     hoverTitle.textContent = item.title;
     if (item.reason) {
       // llm-recommended picks show the shelf note instead of metadata

@@ -95,6 +95,11 @@ export async function search(query, { sectionId, start = 0, size = 20 } = {}) {
   return apiFetch(`/api/media/search?${params}`);
 }
 
+export async function refreshRecommendations() {
+  // the route answers immediately; generation continues server-side
+  return apiFetch('/api/recommendations/refresh', { method: 'POST', timeout: 20000 });
+}
+
 export async function fetchRecommendations() {
   // recommendation generation can be slow server-side, but the route
   // itself always answers quickly from cache or with a pending status

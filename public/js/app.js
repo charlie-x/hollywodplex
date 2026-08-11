@@ -14,6 +14,7 @@ import { createCheckoutCounter } from './scene/checkout.js';
 import { createEmployeeOfMonth } from './scene/employee-plaque.js';
 import { createStorefront, STOREFRONT_WIDTH } from './scene/storefront.js';
 import { createPromoDisplays } from './scene/promo.js';
+import { createTasteScanner } from './scene/scan-button.js';
 import { createDustParticles } from './scene/effects.js';
 import { FirstPersonControls } from './controls/first-person.js';
 import { setupPointerLock } from './controls/pointer-lock.js';
@@ -21,7 +22,7 @@ import { createGamepadControls } from './controls/gamepad.js';
 import { CaseRaycaster } from './controls/raycaster.js';
 import * as THREE from 'three';
 import { ImageLoader } from './api/image-loader.js';
-import { fetchConfig, fetchItems, fetchRecommendations } from './api/media-api.js';
+import { fetchConfig, fetchItems, fetchRecommendations, refreshRecommendations } from './api/media-api.js';
 import { setConfig } from './config.js';
 import { createLoadingScreen } from './ui/loading-screen.js';
 import { createHUD } from './ui/hud.js';
@@ -181,6 +182,15 @@ async function main() {
       : {}),
   });
 
+  // taste scanner pedestal in the gap beside the recommended rack —
+  // only exists when the llm shelves stocked one
+  let scanner = null;
+  const recCentre = shelves.getSectionCentre('Recommended For You');
+  if (recCentre) {
+    scanner = createTasteScanner(sceneManager.scene,
+      new THREE.Vector3(recCentre.x - 1.7, 0, recCentre.z));
+  }
+
   // ---- tv room through the doorway ----
   let tvShelves = null;
   let tvRoom = null;
@@ -317,6 +327,10 @@ async function main() {
     ...storefront.collisionBoxes,
     ...promo.collisionBoxes,
     ...counter.collisionBoxes,
+    ...(scanner ? [new THREE.Box3(
+      new THREE.Vector3(scanner.group.position.x - 0.25, 0, scanner.group.position.z - 0.25),
+      new THREE.Vector3(scanner.group.position.x + 0.25, 1.2, scanner.group.position.z + 0.25),
+    )] : []),
     ...(tvShelves ? tvShelves.getCollisionBoxes() : []),
     ...(tvRoom ? tvRoom.collisionBoxes : []),
     ...(backShelves ? backShelves.getCollisionBoxes() : []),
@@ -328,6 +342,43 @@ async function main() {
   store.on('gamepad-active', () => hud.showMessage(
     'controller: left stick walk, right stick look, a select, b back, y search', 6000,
   ));
+
+  // taste scanner: laser sweep, then a forced regeneration, then the
+  // recommended rack restocks in place once the model has finished
+  let rescanInFlight = false;
+  store.on('taste-scan', async () => {
+    if (!scanner || rescanInFlight) return;
+    rescanInFlight = true;
+    hud.showMessage('taste scan initiated — hold still', 2800);
+    scanner.playScan(controls.getPosition(), () => {
+      hud.showMessage('profile captured — the film buff is thinking...', 5000);
+    });
+    try {
+      const before = (await fetchRecommendations()).generatedAt;
+      await refreshRecommendations();
+      // regeneration takes a while; poll until a new batch lands
+      for (let i = 0; i < 50; i++) {
+        await new Promise(r => setTimeout(r, 6000));
+        const recs = await fetchRecommendations();
+        if (recs.generatedAt && recs.generatedAt !== before) {
+          const shelf = (recs.shelves || []).find(s => s.id === 'recommended');
+          const picks = (shelf?.items || [])
+            .filter(r => store.items.has(String(r.ratingKey)))
+            .map(r => ({ ...store.items.get(String(r.ratingKey)), reason: r.reason }));
+          if (picks.length > 0) {
+            const changed = shelves.restockSection('Recommended For You', picks);
+            hud.showMessage(`fresh picks are on the recommended rack (${changed} swapped)`, 6000);
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn('[app] taste scan failed:', err.message);
+      hud.showMessage('the scanner jammed — try again later', 4000);
+    } finally {
+      rescanInFlight = false;
+    }
+  });
 
   // ambient store audio — starts on the first pointer lock gesture
   const audio = createStoreAudio();
@@ -351,7 +402,10 @@ async function main() {
   // raycaster for case interaction — instanced case meshes plus the kiosk
   const raycaster = new CaseRaycaster(sceneManager.camera, canvas, sceneManager.scene);
   raycaster.setTargets(
-    [{ mesh: kiosk.mesh, item: { isKiosk: true } }],
+    [
+      { mesh: kiosk.mesh, item: { isKiosk: true } },
+      ...(scanner ? [{ mesh: scanner.buttonMesh, item: { isScanButton: true } }] : []),
+    ],
     [
       shelves.getInstancedTarget(),
       tvShelves ? tvShelves.getInstancedTarget() : null,
@@ -435,6 +489,9 @@ async function main() {
 
     // promo animations: the jaws 3-d shark lunge
     if (promo.update) promo.update(dt);
+
+    // taste scanner button pulse and laser sweep
+    if (scanner) scanner.update(dt);
 
     // footsteps while moving
     const moving = store.isPointerLocked

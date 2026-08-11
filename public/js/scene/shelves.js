@@ -124,6 +124,7 @@ export class Shelves {
         position: slot.position,
         quat: slot.quat,
         rotationY: slot.rotationY,
+        sectionTitle: slot.sectionTitle || null,
         index: i,
         loaded: false,
         loading: false,
@@ -360,6 +361,68 @@ export class Shelves {
     c.loaded = false;
     c.loadedUrl = null;
     c.loadedSize = 0;
+  }
+
+  /*
+   * centre of a titled section's cases (featured racks carry titles).
+   */
+  getSectionCentre(title) {
+    const cs = this.cases.filter(c => c.sectionTitle === title);
+    if (cs.length === 0) return null;
+    const centre = { x: 0, z: 0 };
+    for (const c of cs) {
+      centre.x += c.position.x;
+      centre.z += c.position.z;
+    }
+    centre.x /= cs.length;
+    centre.z /= cs.length;
+    return centre;
+  }
+
+  /*
+   * swap a titled section's stock for new items in place. posters
+   * unload and re-stream automatically; shell colours re-roll to the
+   * new keys. returns how many cases changed.
+   */
+  restockSection(title, newItems) {
+    const cs = this.cases
+      .filter(c => c.sectionTitle === title)
+      .sort((a, b) => a.index - b.index);
+    const colour = new THREE.Color();
+    let changed = 0;
+
+    for (let i = 0; i < Math.min(cs.length, newItems.length); i++) {
+      const c = cs[i];
+      const item = newItems[i];
+      if (String(item.ratingKey) === String(c.item.ratingKey)) continue;
+
+      this.#unloadPoster(c);
+      if (c.loading && c.loadingUrl) this.imageLoader.cancel(c.loadingUrl);
+      c.loading = false;
+      c.loadingUrl = null;
+
+      const dupes = this.caseByKey.get(c.item.ratingKey) || [];
+      const at = dupes.indexOf(c);
+      if (at >= 0) dupes.splice(at, 1);
+
+      c.item = item;
+      const list = this.caseByKey.get(item.ratingKey);
+      if (list) list.push(c);
+      else this.caseByKey.set(item.ratingKey, [c]);
+      if (item.thumb) {
+        this.loadedUrls.set(item.ratingKey, item.thumb);
+        this.urlToKey.set(item.thumb, item.ratingKey);
+      }
+
+      colour.set(SHELL_COLOURS[hashKey(item.ratingKey) % SHELL_COLOURS.length]);
+      this.bodiesMesh.setColorAt(c.index, colour);
+      changed++;
+    }
+
+    if (changed > 0 && this.bodiesMesh.instanceColor) {
+      this.bodiesMesh.instanceColor.needsUpdate = true;
+    }
+    return changed;
   }
 
   getInstancedTarget() {

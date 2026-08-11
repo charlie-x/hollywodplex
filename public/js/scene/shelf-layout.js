@@ -400,7 +400,7 @@ export function computeLayout(items, dims = {}, extraFeatured = [], opts = {}) {
     const accent = section.accent || HV_GOLD;
     addGondolaUnit(x, featuredZ, accent);
     slots.push(...fillGondolaUnit(x, featuredZ, section.items.slice(0, SLOTS_PER_UNIT))
-      .map(s => ({ ...s })));
+      .map(s => ({ ...s, sectionTitle: section.title })));
     signs.push({ text: section.title, style: 'topper', accent, position: new THREE.Vector3(x, GONDOLA_HEIGHT, featuredZ) });
   });
 
