@@ -94,37 +94,31 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   scene.add(shape);
   let pass = null;
 
-  // a shape resolves out of the dense fog, looms towards the glass,
-  // and withdraws — depth does the work, not a left-right track
-  function startPass(overrides = {}) {
+  // a shape resolves out of the dense fog, looms nearer, and
+  // withdraws — but never near the glass. up close the illusion
+  // collapses; everything big stays out in the murk
+  function startPass() {
     pass = {
       t: 0,
       dur: 9 + Math.random() * 7,
       x0: (Math.random() - 0.5) * (STOREFRONT_WIDTH - 2),
       xDrift: (Math.random() - 0.5) * 3,
-      zFar: 10.5 + Math.random() * 2.5,
-      zNear: 2.2 + Math.random() * 1.6,
+      zFar: 11 + Math.random() * 2.5,
+      zNear: 5.5 + Math.random() * 2.5,
       y: 1.2 + Math.random() * 1.4,
       scale: 0.9 + Math.random() * 1.1,
       flip: Math.random() < 0.5,
-      charge: false,
-      hitX: null,
-      thumped: false,
-      ...overrides,
     };
-    // charges are made by the tentacle. the tall one is rare, slow,
-    // distant and faint — the less it shows, the bigger it feels
-    const texIdx = pass.charge ? 0 : (Math.random() < 0.15 ? 1 : 0);
+    // the tall one is rarer, slower, further out and fainter still
+    const texIdx = Math.random() < 0.15 ? 1 : 0;
     shape.material.map = shapeTexs[texIdx];
     shape.material.needsUpdate = true;
     pass.dim = 1;
     pass.stretchY = 1;
     if (texIdx === 1) {
-      // stretched skyward so only legs cross the view, kept well out
-      // in the murk, taking its time
       pass.stretchY = 1.9;
       pass.y = 2.2 + Math.random() * 0.5;
-      pass.zNear = Math.max(pass.zNear, 5.5 + Math.random() * 2);
+      pass.zNear = Math.max(pass.zNear, 7.5 + Math.random() * 1.5);
       pass.dur = 14 + Math.random() * 6;
       pass.dim = 0.6;
     }
@@ -148,14 +142,10 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     shape.rotation.z = 0.06 * Math.sin(pass.t * 0.9);
     const s = pass.scale * (1 + 0.05 * Math.sin(pass.t * 2.1));
     shape.scale.set(s * (pass.flip ? -1 : 1), s * (pass.stretchY || 1), 1);
-    // solidity comes entirely from how close it dares to come
-    shape.material.opacity = Math.max(0, 0.62 - (z - 2.0) * 0.055) * (pass.dim || 1);
+    // solidity comes entirely from how close it dares to come — the
+    // curve is tuned so mid-fog still reads strongly
+    shape.material.opacity = Math.max(0, 0.72 - (z - 4.0) * 0.06) * (pass.dim || 1);
 
-    // a charge slams the glass at the moment of closest approach
-    if (pass.charge && !pass.thumped && f >= 0.5) {
-      pass.thumped = true;
-      thumpImpact(pass.hitX);
-    }
     if (f >= 1) {
       pass = null;
       shape.visible = false;
@@ -202,25 +192,8 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     });
   }
 
-  // a strike prefers to show its cause: if nothing is out there, a
-  // charging shape comes first and the impact lands at its closest
-  // approach. if something is already prowling, the hit just happens
-  function scheduleStrike() {
-    if (!pass) {
-      const hitX = cx + (Math.random() - 0.5) * (STOREFRONT_WIDTH - 1.6);
-      startPass({
-        charge: true,
-        hitX,
-        x0: hitX - cx,
-        xDrift: (Math.random() - 0.5) * 0.6,
-        dur: 4.5 + Math.random() * 2,
-        zNear: 1.5,
-      });
-    } else {
-      thumpImpact(null);
-    }
-  }
-
+  // the strikers themselves are never seen coming — too small and
+  // too fast. only the aftermath on the glass
   function thumpImpact(hitX) {
     store.emit('glass-thump');
     const free = cracks.find(c => c.age < 0);
@@ -481,7 +454,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
         thumpIn -= dt;
         applyFog(); // keeps the breathing going at full thickness
         if (thumpIn <= 0) {
-          scheduleStrike();
+          thumpImpact(null);
           // they come thick and fast, often in flurries
           thumpIn = Math.random() < 0.5
             ? 0.4 + Math.random() * 0.9
