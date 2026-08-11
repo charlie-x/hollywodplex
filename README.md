@@ -79,14 +79,24 @@ set — the app infers it. keeping both blocks filled in lets you flip
 between servers by changing the one line (or starting the app with
 `MEDIA_SERVER=jellyfin npm start`).
 
-the llm features work with either llm backend. anthropic is used when
-both are configured (set `LLM_PROVIDER=ollama` to override), and the
-anthropic model defaults to claude-opus-5 (`ANTHROPIC_MODEL` overrides
-it). ollama needs a model with a large context window for the shelf
-curation, since the whole catalogue goes into the prompt —
+the llm features work with any of three backends: anthropic
+(`ANTHROPIC_API_KEY`, model defaults to claude-opus-5 —
+`ANTHROPIC_MODEL` overrides it), a local ollama server (`OLLAMA_URL`),
+or any openai-compatible server such as vllm, llama.cpp server or lm
+studio (`OPENAI_BASE_URL`, with or without the `/v1` suffix;
+`OPENAI_API_KEY` only if your server wants one; `OPENAI_MODEL`
+defaults to the first model the server lists). anthropic is used when
+several are configured — set `LLM_PROVIDER=anthropic|ollama|openai`
+to override.
+
+local models need a large context window for the shelf curation,
+since the whole catalogue goes into the prompt — for ollama,
 `OLLAMA_NUM_CTX` (default 32768) must fit within what your model and
-ram can handle, and pick quality depends heavily on the model's film
-knowledge.
+ram can handle; for openai-compatible servers the context length is
+set server-side. reasoning models also spend hidden thinking tokens
+from the same output budget the json answer needs, so if shelves come
+out short set `OPENAI_MAX_TOKENS` above the default 24000. pick
+quality depends heavily on the model's film knowledge.
 
 curated shelves are cached in `data/shelves.json` and refreshed in the
 background every three days; `POST /api/recommendations/refresh`
@@ -144,9 +154,9 @@ and use the "fix match" button to search the providers and apply the
 right match. this works on both plex and jellyfin.
 
 for bulk cleanup there is a three-stage pipeline (requires an llm
-backend — anthropic or ollama — since a model judges each candidate
-list). it talks to the running app's api, so it works with whichever
-server is configured:
+backend — anthropic, ollama or an openai-compatible server — since a
+model judges each candidate list). it talks to the running app's api,
+so it works with whichever server is configured:
 
 ```bash
 node tools/fix-unmatched/scan.js    # gather match candidates
