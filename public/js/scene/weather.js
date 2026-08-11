@@ -38,10 +38,12 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   const baseFog = softFogTexture();
   let airT = 0; // shared clock for drift and breathing
   for (const [dz, maxOpacity, delay, drift] of [
-    [14.6, 0.95, 0.0, 0.004],
-    [9.0, 0.8, 0.25, 0.008],
-    [5.0, 0.65, 0.5, -0.011],
-    [1.6, 0.5, 0.75, 0.016],
+    [15.2, 0.98, 0.0, 0.004],
+    [11.0, 0.9, 0.2, -0.007],
+    [7.6, 0.82, 0.4, 0.01],
+    [4.6, 0.72, 0.55, -0.013],
+    [2.4, 0.6, 0.7, 0.017],
+    [0.9, 0.45, 0.82, 0.022], // right up against the pavement
   ]) {
     const tex = baseFog.clone();
     tex.needsUpdate = true;
@@ -58,6 +60,21 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     scene.add(bank);
     banks.push({ mesh: bank, maxOpacity, delay, drift, phase: dz });
   }
+
+  // low rolling mist lying over the tarmac itself
+  const groundTex = baseFog.clone();
+  groundTex.needsUpdate = true;
+  const groundMist = new THREE.Mesh(
+    new THREE.PlaneGeometry(STOREFRONT_WIDTH + 22, 16),
+    new THREE.MeshBasicMaterial({
+      map: groundTex, color: '#c4c6ca', transparent: true, opacity: 0,
+      depthWrite: false,
+    }),
+  );
+  groundMist.rotation.x = -Math.PI / 2;
+  groundMist.position.set(cx, 0.4, wallZ + 8.5);
+  groundMist.visible = false;
+  scene.add(groundMist);
 
   // ---- the things in the fog: varied silhouettes drifting past ----
   const shapeTexs = creatureTextures();
@@ -368,6 +385,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     grabPlanned = cars.length > 0;
     grabAt = 8 + Math.random() * (siegeLeft - 20);
     for (const b of banks) b.mesh.visible = true;
+    groundMist.visible = true;
   }
 
   function applyFog() {
@@ -377,6 +395,8 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       b.mesh.material.opacity = b.maxOpacity * local
         * (0.92 + 0.08 * Math.sin(airT * 0.35 + b.phase));
     }
+    groundMist.material.opacity = 0.5 * fogLevel
+      * (0.9 + 0.1 * Math.sin(airT * 0.28));
   }
 
   function update(dt) {
@@ -384,6 +404,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     // the banks drift sideways at different speeds for parallax
     if (state !== 'idle') {
       for (const b of banks) b.mesh.material.map.offset.x += b.drift * dt;
+      groundMist.material.map.offset.x += 0.006 * dt;
     }
 
     // the street lamp struggles while the weather is in
@@ -486,6 +507,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
         if (timer <= 0) {
           fogLevel = 0;
           for (const b of banks) b.mesh.visible = false;
+          groundMist.visible = false;
           for (const c of cracks) {
             c.age = -1;
             c.mesh.visible = false;

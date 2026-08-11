@@ -15,16 +15,43 @@ export function softFogTexture() {
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, 512, 256);
-  for (let i = 0; i < 90; i++) {
+
+  // a dense base first: thick at the ground, thinning towards the
+  // top edge so the bank has no hard line against the sky. blobs
+  // alone leave see-through gaps, which reads as thin haze not mist
+  const base = ctx.createLinearGradient(0, 0, 0, 256);
+  base.addColorStop(0, 'rgba(255,255,255,0.06)');
+  base.addColorStop(0.3, 'rgba(255,255,255,0.55)');
+  base.addColorStop(0.65, 'rgba(255,255,255,0.85)');
+  base.addColorStop(1, 'rgba(255,255,255,0.95)');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, 512, 256);
+
+  // billows over the top for texture
+  for (let i = 0; i < 70; i++) {
     const x = (i * 73) % 512;
-    const y = 60 + ((i * 41) % 180);
-    const r = 40 + (i * 17) % 70;
+    const y = 40 + ((i * 41) % 200);
+    const r = 45 + (i * 17) % 75;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(255,255,255,0.30)');
+    g.addColorStop(0, 'rgba(255,255,255,0.16)');
     g.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
+  // and a few soft thin patches so the wall churns rather than sits
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 16; i++) {
+    const x = (i * 157) % 512;
+    const y = 90 + ((i * 61) % 130);
+    const r = 30 + (i * 23) % 40;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(0,0,0,0.18)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping; // the banks drift sideways
