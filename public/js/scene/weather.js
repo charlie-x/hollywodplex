@@ -91,8 +91,12 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       thumped: false,
       ...overrides,
     };
-    shape.material.map = shapeTexs[Math.floor(Math.random() * shapeTexs.length)];
+    const texIdx = Math.floor(Math.random() * shapeTexs.length);
+    shape.material.map = shapeTexs[texIdx];
     shape.material.needsUpdate = true;
+    // the tall one gets stretched skyward so only legs cross the view
+    pass.stretchY = texIdx === 2 ? 1.9 : 1;
+    if (texIdx === 2) pass.y = 2.2 + Math.random() * 0.5;
     shape.visible = true;
   }
 
@@ -112,7 +116,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     if (eye) shape.lookAt(eye.x, shape.position.y, eye.z);
     shape.rotation.z = 0.06 * Math.sin(pass.t * 0.9);
     const s = pass.scale * (1 + 0.05 * Math.sin(pass.t * 2.1));
-    shape.scale.set(s * (pass.flip ? -1 : 1), s, 1);
+    shape.scale.set(s * (pass.flip ? -1 : 1), s * (pass.stretchY || 1), 1);
     // solidity comes entirely from how close it dares to come
     shape.material.opacity = Math.max(0, 0.62 - (z - 2.0) * 0.055);
 

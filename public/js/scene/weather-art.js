@@ -33,10 +33,11 @@ export function softFogTexture() {
 
 /*
  * three vague silhouettes, never clearly seen: a many-limbed drifter,
- * a single sweeping tentacle, and something on ragged wings.
+ * a single sweeping tentacle, and something far too tall — only its
+ * legs pass through the frame.
  */
 export function creatureTextures() {
-  return [drifter(), tentacle(), winged()];
+  return [drifter(), tentacle(), stilts()];
 }
 
 function shapeCanvas() {
@@ -83,42 +84,65 @@ function tentacle() {
     );
     ctx.stroke();
   }
-  // sucker bumps along the underside
+  // sucker bumps riding the underside of the actual curve — sampled
+  // along each bezier segment and offset down its normal, so they
+  // cling to the limb instead of marching off on a straight line
   ctx.fillStyle = 'rgba(0,0,0,0.8)';
-  for (let i = 0; i < 7; i++) {
-    ctx.beginPath();
-    ctx.arc(40 + i * 30, 105 - i * 9, 6, 0, Math.PI * 2);
-    ctx.fill();
+  for (let s = 0; s < 3; s++) {
+    const [x0, y0] = spine[s];
+    const [x1, y1] = spine[s + 1];
+    const cxp = (x0 + x1) / 2 + 12;
+    const cyp = (y0 + y1) / 2 - 18;
+    const half = (26 - s * 8) / 2;
+    for (const t of [0.2, 0.45, 0.7, 0.9]) {
+      const mt = 1 - t;
+      const px = mt * mt * x0 + 2 * mt * t * cxp + t * t * x1;
+      const py = mt * mt * y0 + 2 * mt * t * cyp + t * t * y1;
+      const tx = 2 * (mt * (cxp - x0) + t * (x1 - cxp));
+      const ty = 2 * (mt * (cyp - y0) + t * (y1 - cyp));
+      const len = Math.hypot(tx, ty) || 1;
+      let nx = ty / len;
+      let ny = -tx / len;
+      if (ny < 0) { nx = -nx; ny = -ny; } // hang below, not above
+      const r = 6.5 - s * 1.5;
+      ctx.beginPath();
+      ctx.arc(px + nx * (half + r * 0.6), py + ny * (half + r * 0.6), r, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   return new THREE.CanvasTexture(canvas);
 }
 
-function winged() {
+function stilts() {
   const { canvas, ctx } = shapeCanvas();
-  ctx.fillStyle = 'rgba(0,0,0,0.9)';
-  // body
-  ctx.beginPath();
-  ctx.ellipse(128, 84, 26, 44, 0.1, 0, Math.PI * 2);
-  ctx.fill();
-  // ragged wings
-  for (const side of [-1, 1]) {
+  // long jointed legs descending from something above the frame —
+  // the body is never seen, which is the point
+  ctx.strokeStyle = 'rgba(0,0,0,0.88)';
+  ctx.lineCap = 'round';
+  const legXs = [42, 96, 158, 216];
+  for (let i = 0; i < legXs.length; i++) {
+    const x = legXs[i];
+    const kneeX = x + ((i % 2) ? 18 : -16);
+    const kneeY = 55 + (i * 13) % 30;
+    const footX = x + ((i % 2) ? -8 : 12);
+    // upper leg, thicker
+    ctx.lineWidth = 11 - (i % 2) * 2;
     ctx.beginPath();
-    ctx.moveTo(128, 66);
-    ctx.quadraticCurveTo(128 + side * 60, 10, 128 + side * 112, 34);
-    ctx.lineTo(128 + side * 88, 58);
-    ctx.lineTo(128 + side * 104, 74);
-    ctx.lineTo(128 + side * 62, 84);
-    ctx.closePath();
+    ctx.moveTo(x, -6);
+    ctx.lineTo(kneeX, kneeY);
+    ctx.stroke();
+    // lower leg, tapering to the foot
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(kneeX, kneeY);
+    ctx.lineTo(footX, 158);
+    ctx.stroke();
+    // a hard little joint at the knee
+    ctx.fillStyle = 'rgba(0,0,0,0.9)';
+    ctx.beginPath();
+    ctx.arc(kneeX, kneeY, 8, 0, Math.PI * 2);
     ctx.fill();
   }
-  // trailing tail
-  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-  ctx.lineWidth = 6;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(128, 126);
-  ctx.quadraticCurveTo(118, 148, 132, 158);
-  ctx.stroke();
   return new THREE.CanvasTexture(canvas);
 }
 
