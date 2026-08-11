@@ -175,6 +175,8 @@ export function splatTextures() {
     bugSplat('150,168,60', '96,110,34', 3, 3),
     bugSplat('168,158,44', '110,96,30', 2, 4),
     bugSplat('132,150,72', '80,102,42', 4, 2),
+    bugSplat('170,140,120', '112,84,70', 3, 5), // pinkish-grey, leggier
+    bugSplat('110,124,48', '64,76,26', 5, 3),   // dark olive, long body
   ];
 }
 

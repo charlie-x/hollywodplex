@@ -17,7 +17,7 @@ const SIEGE_MIN = 60;          // how long the fog sits at full thickness
 const SIEGE_MAX = 90;
 const ROLL_IN = 15;
 const ROLL_OUT = 20;
-const MAX_CRACKS = 4;
+const MAX_CRACKS = 7;
 
 export function createWeatherEvent(scene, dims, opts = {}) {
   const cx = dims.cx ?? 0;
@@ -207,7 +207,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     free.mesh.rotation.z = Math.random() * Math.PI * 2;
     // most impacts leave the bug that made them smeared on the glass,
     // and gravity gets them all eventually
-    free.hasSplat = Math.random() < 0.75;
+    free.hasSplat = Math.random() < 0.9;
     if (free.hasSplat) {
       free.splatSize = 0.7 + Math.random() * 0.8;
       free.startY = hy + (Math.random() - 0.5) * 0.12;
@@ -352,7 +352,8 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     siegeLeft = SIEGE_MIN + Math.random() * (SIEGE_MAX - SIEGE_MIN);
     thumpIn = 6 + Math.random() * 6;
     siegeT = 0;
-    grabPlanned = cars.length > 0 && Math.random() < 0.7;
+    // the car is always taken — it is the centrepiece of the visit
+    grabPlanned = cars.length > 0;
     grabAt = 8 + Math.random() * (siegeLeft - 20);
     for (const b of banks) b.mesh.visible = true;
   }
@@ -441,7 +442,10 @@ export function createWeatherEvent(scene, dims, opts = {}) {
         applyFog(); // keeps the breathing going at full thickness
         if (thumpIn <= 0) {
           scheduleStrike();
-          thumpIn = 8 + Math.random() * 10;
+          // sometimes they come in flurries, two or three in seconds
+          thumpIn = Math.random() < 0.35
+            ? 0.6 + Math.random() * 1.2
+            : 5 + Math.random() * 7;
         }
         if (grabPlanned && !grab && siegeT >= grabAt) beginGrab();
         if (!pass && Math.random() < dt * 0.08) startPass();
