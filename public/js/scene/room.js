@@ -41,6 +41,8 @@ export function createRoom(scene, dims = {}) {
   const dingy = dims.style === 'dingy';
   const group = new THREE.Group();
   const collisionBoxes = [];
+  let bulbMesh = null;
+  let update = null;
 
   // ---- floor: purple confetti carpet (bare dark floor when dingy) ----
   const floor = new THREE.Mesh(
@@ -94,6 +96,7 @@ export function createRoom(scene, dims = {}) {
     );
     bulb.position.set(cx, ROOM_HEIGHT - 0.5, cz);
     group.add(bulb);
+    bulbMesh = bulb;
     const cord = new THREE.Mesh(
       new THREE.CylinderGeometry(0.008, 0.008, 0.5),
       new THREE.MeshStandardMaterial({ color: '#111111' }),
@@ -146,6 +149,23 @@ export function createRoom(scene, dims = {}) {
     const red = new THREE.PointLight('#ff3322', 14, 0, 2);
     red.position.set(cx, ROOM_HEIGHT - 0.55, cz);
     scene.add(red);
+
+    // the bulb never sits quite steady: a slow breathe with a mains
+    // buzz on top, and the occasional sputter towards going out
+    let t = Math.random() * 10;
+    let sputter = 0;
+    update = (dt) => {
+      t += dt;
+      let level = 0.86 + 0.1 * Math.sin(t * 1.7) + 0.04 * Math.sin(t * 13.3);
+      if (sputter > 0) {
+        sputter -= dt;
+        level *= 0.45 + 0.3 * Math.abs(Math.sin(t * 60));
+      } else if (Math.random() < dt * 0.35) {
+        sputter = 0.08 + Math.random() * 0.25;
+      }
+      red.intensity = 14 * level;
+      if (bulbMesh) bulbMesh.material.emissiveIntensity = 2.5 * level;
+    };
   } else {
     // secondary rooms: overhead area lights matching the troffer grid
     RectAreaLightUniformsLib.init();
@@ -163,6 +183,7 @@ export function createRoom(scene, dims = {}) {
     group,
     dimensions: { width, depth, height: ROOM_HEIGHT, cx, cz },
     collisionBoxes,
+    update,
     dispose() {
       scene.remove(group);
     },

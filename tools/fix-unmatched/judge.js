@@ -8,7 +8,7 @@
  */
 
 import 'dotenv/config';
-import Anthropic from '@anthropic-ai/sdk';
+import { generateStructured, llmAvailable, llmDescription } from '../../server/services/llm-client.js';
 import { loadState, saveState } from './lib.js';
 
 const BATCH_SIZE = 40;
@@ -16,9 +16,12 @@ const maxBatches = parseInt(process.argv[2], 10) || 10;
 
 const state = loadState();
 const pending = state.items.filter(i => i.candidates && i.verdict === undefined);
+if (!llmAvailable()) {
+  console.error('no llm configured: set ANTHROPIC_API_KEY or OLLAMA_URL in .env');
+  process.exit(1);
+}
+console.log(`judging with ${llmDescription()}`);
 console.log(`${pending.length} judged items pending, doing up to ${maxBatches} batches of ${BATCH_SIZE}`);
-
-const client = new Anthropic(); // reads ANTHROPIC_API_KEY from the environment
 
 const schema = {
   type: 'object',
@@ -49,10 +52,9 @@ async function judgeBatch(items) {
     return `${i.ratingKey} :: file title: "${i.title}"${i.year ? ` (file year ${i.year})` : ''} :: candidates: ${cands}`;
   }).join('\n');
 
-  const stream = client.messages.stream({
-    model: 'claude-opus-5',
-    max_tokens: 8000,
-    thinking: { type: 'adaptive' },
+  const result = await generateStructured({
+    maxTokens: 8000,
+    schema,
     system: 'you match messy video filenames to the correct film. filenames often '
       + 'embed director names, actor names, "aka" alternate titles, release years, '
       + 'or original-language titles. use your film knowledge to bridge translated '
@@ -61,14 +63,9 @@ async function judgeBatch(items) {
       + 'filename is too vague, names only a director, looks like a disc part, or '
       + 'no candidate fits, abstain with -1. one pick per input line, ratingKeys '
       + 'exactly as given.',
-    output_config: { format: { type: 'json_schema', schema } },
-    messages: [{ role: 'user', content: lines }],
+    prompt: lines,
   });
-
-  const response = await stream.finalMessage();
-  if (response.stop_reason === 'refusal') throw new Error('model declined the batch');
-  const text = response.content.find(b => b.type === 'text')?.text;
-  return JSON.parse(text).picks;
+  return result.picks;
 }
 
 for (let b = 0; b < maxBatches; b++) {

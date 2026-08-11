@@ -6,11 +6,11 @@
  * results are cached to disk so the model is only asked every few days.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import plexClient from './plex-client.js';
+import { generateStructured } from './llm-client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CACHE_FILE = resolve(__dirname, '..', '..', 'data', 'shelves.json');
@@ -77,7 +77,6 @@ const pickSchema = {
  * one call stocks all three shelves.
  */
 async function askClaude(watched, catalogue) {
-  const client = new Anthropic(); // reads ANTHROPIC_API_KEY from the environment
   const today = new Date().toISOString().slice(0, 10);
 
   const watchedText = watched
@@ -109,39 +108,23 @@ async function askClaude(watched, catalogue) {
     additionalProperties: false,
   };
 
-  const stream = client.messages.stream({
-    model: 'claude-opus-5',
-    max_tokens: 24000,
+  return generateStructured({
+    maxTokens: 24000,
+    schema,
     system: 'you are the resident film buff at a video rental store, stocking '
       + 'themed shelves for one regular customer and their household. you know '
       + 'the whole catalogue. reasons must be short (under 15 words), specific, '
       + 'and written like handwritten shelf notes. only pick from the unwatched '
       + 'catalogue, and return ratingKeys exactly as given.',
-    output_config: {
-      format: { type: 'json_schema', schema },
-    },
-    messages: [{
-      role: 'user',
-      content: `today's date: ${today}\n\n`
-        + `films this customer has watched (most recent first), format ratingKey|title (year) [genres] rating:\n\n${watchedText}\n\n`
-        + `the catalogue of films they have NOT watched:\n\n${catalogueText}\n\n`
-        + `stock three shelves:\n`
-        + `1. "recommendations" — exactly 56 picks for this customer based on their history. mix safe bets with adventurous picks and hidden gems.\n`
-        + `2. "holiday" — work out the nearest upcoming holiday or seasonal occasion from today's date, name it, give the shelf a punchy title (max 20 characters), and stock up to 40 films that fit the occasion.\n`
-        + `3. "partnerPicks" — up to 40 films for the customer's wife. her taste is complementary to his: assume she enjoys romance, sharp comedies, feel-good and prestige drama, and great crowd-pleasers, and avoid his heavy action/crime staples unless they are genuine date-night material. quality over cliche.\n`
-        + `4. "cultClassics" — up to 56 genuine cult films from the catalogue: midnight movies, so-bad-its-good legends, video store folklore, films with devoted followings. for this shelf only, you may also pick from the watched list — a cult wall is a cult wall.`,
-    }],
+    prompt: `today's date: ${today}\n\n`
+      + `films this customer has watched (most recent first), format ratingKey|title (year) [genres] rating:\n\n${watchedText}\n\n`
+      + `the catalogue of films they have NOT watched:\n\n${catalogueText}\n\n`
+      + `stock three shelves:\n`
+      + `1. "recommendations" — exactly 56 picks for this customer based on their history. mix safe bets with adventurous picks and hidden gems.\n`
+      + `2. "holiday" — work out the nearest upcoming holiday or seasonal occasion from today's date, name it, give the shelf a punchy title (max 20 characters), and stock up to 40 films that fit the occasion.\n`
+      + `3. "partnerPicks" — up to 40 films for the customer's wife. her taste is complementary to his: assume she enjoys romance, sharp comedies, feel-good and prestige drama, and great crowd-pleasers, and avoid his heavy action/crime staples unless they are genuine date-night material. quality over cliche.\n`
+      + `4. "cultClassics" — up to 56 genuine cult films from the catalogue: midnight movies, so-bad-its-good legends, video store folklore, films with devoted followings. for this shelf only, you may also pick from the watched list — a cult wall is a cult wall.`,
   });
-
-  const response = await stream.finalMessage();
-
-  if (response.stop_reason === 'refusal') {
-    throw new Error('model declined the request');
-  }
-
-  const text = response.content.find(b => b.type === 'text')?.text;
-  if (!text) throw new Error('no text in response');
-  return JSON.parse(text);
 }
 
 /*

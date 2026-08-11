@@ -9,7 +9,11 @@ import { createRoom } from './scene/room.js';
 import { Shelves, computeStoreDims } from './scene/shelves.js';
 import { createKiosk } from './scene/kiosk.js';
 import { createSign } from './scene/signage.js';
-import { createCheckoutCounter, createWallPosters, createStockBanner, createCurtain } from './scene/decor.js';
+import { createWallPosters, createStockBanner, createCurtain } from './scene/decor.js';
+import { createCheckoutCounter } from './scene/checkout.js';
+import { createEmployeeOfMonth } from './scene/employee-plaque.js';
+import { createStorefront, STOREFRONT_WIDTH } from './scene/storefront.js';
+import { createPromoDisplays } from './scene/promo.js';
 import { createDustParticles } from './scene/effects.js';
 import { FirstPersonControls } from './controls/first-person.js';
 import { setupPointerLock } from './controls/pointer-lock.js';
@@ -128,10 +132,15 @@ async function main() {
     marquee: 'hollywoodplex',
     mainLighting: true,
     doorways: {
+      // the glass storefront fills this opening — collision keeps it shut
+      front: [{ offset: 0, width: STOREFRONT_WIDTH }],
       ...(tvItems.length > 0 ? { left: [{ offset: doorZOffset, width: 3.5 }] } : {}),
       ...(backroomItems.length > 0 ? { right: [{ offset: backDoorZ, width: 2 }] } : {}),
     },
   });
+
+  // glass entrance looking out on the night-time car park
+  const storefront = createStorefront(sceneManager.scene, dims);
   loadingScreen.setProgress(0.65);
 
   // llm-curated shelves — served from the server-side cache, so this
@@ -256,6 +265,12 @@ async function main() {
   );
   sceneManager.scene.add(counter.group);
 
+  // employee of the month plaque on the wall behind the counter,
+  // offset so it clears the framed release posters either side
+  sceneManager.scene.add(createEmployeeOfMonth(
+    new THREE.Vector3(-dims.width / 2 + 5.2, 2.05, dims.depth / 2 - 0.17), Math.PI,
+  ));
+
   // framed posters high on the walls: the latest releases, like the
   // promo one-sheets a store would hang for new stock
   const releaseDate = (i) => i.originallyAvailableAt
@@ -264,7 +279,12 @@ async function main() {
   const posterPicks = [...shopItems]
     .filter(i => releaseDate(i) > 0)
     .sort((a, b) => releaseDate(b) - releaseDate(a));
-  createWallPosters(sceneManager.scene, movieRoom.dimensions, posterPicks, 20);
+  createWallPosters(sceneManager.scene, movieRoom.dimensions, posterPicks, 20,
+    { frontClear: STOREFRONT_WIDTH / 2 + 1.2 });
+
+  // entrance promo dressing: a-frames with the newest releases,
+  // popcorn and soda by the window, and the 3-d glasses standee
+  const promo = createPromoDisplays(sceneManager.scene, dims, posterPicks);
   if (tvRoom) {
     const tvPicks = [...tvItems]
       .filter(i => releaseDate(i) > 0)
@@ -288,6 +308,8 @@ async function main() {
   controls.setCollisionBoxes([
     ...shelves.getCollisionBoxes(),
     ...movieRoom.collisionBoxes,
+    ...storefront.collisionBoxes,
+    ...promo.collisionBoxes,
     ...counter.collisionBoxes,
     ...(tvShelves ? tvShelves.getCollisionBoxes() : []),
     ...(tvRoom ? tvRoom.collisionBoxes : []),
@@ -391,6 +413,15 @@ async function main() {
 
     // update dust particles
     if (dust.update) dust.update(dt);
+
+    // back room bulb flicker
+    if (backRoom && backRoom.update) backRoom.update(dt);
+
+    // storefront neon: open sign buzz and the broken brandys b
+    if (storefront.update) storefront.update(dt);
+
+    // promo animations: the jaws 3-d shark lunge
+    if (promo.update) promo.update(dt);
 
     // footsteps while moving
     const moving = store.isPointerLocked

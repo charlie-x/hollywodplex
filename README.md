@@ -46,7 +46,18 @@ PORT=3478
 
 # optional: enables the llm-curated shelves and match judging
 ANTHROPIC_API_KEY=your-anthropic-api-key
+
+# or use a local ollama server instead of anthropic
+#OLLAMA_URL=http://localhost:11434
+#OLLAMA_MODEL=llama3.1:8b
 ```
+
+the llm features work with either backend. anthropic is used when both
+are configured (set `LLM_PROVIDER=ollama` to override). ollama needs a
+model with a large context window for the shelf curation, since the
+whole catalogue goes into the prompt — `OLLAMA_NUM_CTX` (default 32768)
+must fit within what your model and ram can handle, and pick quality
+depends heavily on the model's film knowledge.
 
 `.env` is gitignored — keep your token and keys there and nowhere else.
 

@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import plexClient from '../services/plex-client.js';
 import { getRecommendations } from '../services/recommender.js';
+import { llmAvailable } from '../services/llm-client.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ async function firstMovieSection() {
  */
 router.get('/', async (_req, res, next) => {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!llmAvailable()) {
       return res.json({ generatedAt: null, items: [], status: 'disabled' });
     }
     const sectionId = await firstMovieSection();
@@ -43,7 +44,7 @@ router.get('/', async (_req, res, next) => {
  */
 router.post('/refresh', async (_req, res, next) => {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!llmAvailable()) {
       return res.json({ status: 'disabled' });
     }
     const sectionId = await firstMovieSection();

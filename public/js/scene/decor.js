@@ -11,80 +11,14 @@ const HV_GOLD = '#f0c419';
 const HV_WHITE = '#f2f0ea';
 
 /*
- * checkout counter with a till and a returns bin.
- * returns { group, collisionBoxes }.
- */
-export function createCheckoutCounter(position, rotationY = 0) {
-  const group = new THREE.Group();
-
-  // counter body: navy front, white top
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(3.2, 1.05, 0.7),
-    new THREE.MeshStandardMaterial({ color: HV_NAVY, roughness: 0.7 }),
-  );
-  body.position.y = 0.525;
-  body.castShadow = true;
-  group.add(body);
-
-  const top = new THREE.Mesh(
-    new THREE.BoxGeometry(3.4, 0.06, 0.85),
-    new THREE.MeshStandardMaterial({ color: HV_WHITE, roughness: 0.35 }),
-  );
-  top.position.y = 1.08;
-  group.add(top);
-
-  // red trim strip along the counter front
-  const trim = new THREE.Mesh(
-    new THREE.BoxGeometry(3.2, 0.08, 0.02),
-    new THREE.MeshStandardMaterial({
-      color: HV_RED, emissive: HV_RED, emissiveIntensity: 0.4, roughness: 0.4,
-    }),
-  );
-  trim.position.set(0, 0.85, 0.36);
-  group.add(trim);
-
-  // till on the counter
-  const till = new THREE.Mesh(
-    new THREE.BoxGeometry(0.45, 0.3, 0.4),
-    new THREE.MeshStandardMaterial({ color: '#2a2a30', roughness: 0.5, metalness: 0.3 }),
-  );
-  till.position.set(-1.0, 1.26, 0);
-  group.add(till);
-
-  // returns bin beside the counter
-  const bin = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.8, 0.7),
-    new THREE.MeshStandardMaterial({ color: HV_RED, roughness: 0.6 }),
-  );
-  bin.position.set(2.3, 0.4, 0);
-  group.add(bin);
-
-  const binLabel = makeTextPlane('RETURNS', HV_WHITE, HV_RED, 256, 64);
-  binLabel.scale.set(0.6, 0.15, 1);
-  binLabel.position.set(2.3, 0.55, 0.36);
-  group.add(binLabel);
-
-  group.position.copy(position);
-  group.rotation.y = rotationY;
-  group.updateMatrixWorld(true);
-
-  // collision boxes in world space
-  const collisionBoxes = [
-    new THREE.Box3().setFromObject(body),
-    new THREE.Box3().setFromObject(bin),
-  ];
-
-  group.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
-
-  return { group, collisionBoxes };
-}
-
-/*
  * framed posters high on the walls using the library's own artwork.
  * items should have thumb urls; textures load once and stay resident.
  */
-export function createWallPosters(scene, roomDims, items, count = 8) {
+export function createWallPosters(scene, roomDims, items, count = 8, opts = {}) {
   const { width, depth, cx, cz } = roomDims;
+  // clear half-width kept free in the middle of the entrance wall,
+  // e.g. for the glass storefront
+  const frontClear = opts.frontClear ?? 0;
   const group = new THREE.Group();
   const loader = new THREE.TextureLoader();
 
@@ -98,11 +32,25 @@ export function createWallPosters(scene, roomDims, items, count = 8) {
   const EYE_Y = 1.9;
   const HIGH_Y = 3.95; // clears the 3.3m wall shelving, well off the ceiling
 
-  // entrance wall: a full eye-level row facing into the store
+  // entrance wall: an eye-level row facing into the store, split
+  // either side of the glass storefront when one is present
   const frontCount = Math.min(7, Math.ceil(count / 2));
-  for (let i = 0; i < frontCount; i++) {
-    const x = cx - width / 3 + (i + 0.5) * (width / 1.5 / frontCount);
-    spots.push({ x, y: EYE_Y, z: cz + depth / 2 - 0.18, ry: Math.PI });
+  if (frontClear > 0) {
+    const ranges = [
+      [cx - width / 2 + 2, cx - frontClear],
+      [cx + frontClear, cx + width / 2 - 2],
+    ];
+    const perSide = Math.ceil(frontCount / 2);
+    for (let i = 0; i < frontCount; i++) {
+      const [a, b] = ranges[i % 2];
+      const x = a + (Math.floor(i / 2) + 0.5) * ((b - a) / perSide);
+      spots.push({ x, y: EYE_Y, z: cz + depth / 2 - 0.18, ry: Math.PI });
+    }
+  } else {
+    for (let i = 0; i < frontCount; i++) {
+      const x = cx - width / 3 + (i + 0.5) * (width / 1.5 / frontCount);
+      spots.push({ x, y: EYE_Y, z: cz + depth / 2 - 0.18, ry: Math.PI });
+    }
   }
 
   // under the marquee: the back wall centre keeps clear of shelving
@@ -216,9 +164,9 @@ export function createCurtain(position, doorWidth = 2, rotationY = 0) {
 }
 
 /*
- * simple double-sided text plane helper.
+ * simple double-sided text plane helper (also used by checkout.js).
  */
-function makeTextPlane(text, textColour, bgColour, w, h) {
+export function makeTextPlane(text, textColour, bgColour, w, h) {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
