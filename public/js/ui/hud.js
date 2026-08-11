@@ -104,6 +104,12 @@ export function createHUD() {
       hoverCard.style.display = 'flex';
       return;
     }
+    if (item.isZoltar) {
+      hoverTitle.textContent = 'zoltar speaks';
+      hoverMeta.textContent = 'press the button for a movie fortune';
+      hoverCard.style.display = 'flex';
+      return;
+    }
     hoverTitle.textContent = item.title;
     if (item.reason) {
       // llm-recommended picks show the shelf note instead of metadata

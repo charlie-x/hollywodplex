@@ -15,6 +15,7 @@ import { createEmployeeOfMonth } from './scene/employee-plaque.js';
 import { createStorefront, STOREFRONT_WIDTH } from './scene/storefront.js';
 import { createPromoDisplays } from './scene/promo.js';
 import { createTasteScanner } from './scene/scan-button.js';
+import { createZoltar } from './scene/zoltar.js';
 import { createDustParticles } from './scene/effects.js';
 import { FirstPersonControls } from './controls/first-person.js';
 import { setupPointerLock } from './controls/pointer-lock.js';
@@ -191,6 +192,10 @@ async function main() {
       new THREE.Vector3(recCentre.x - 1.7, 0, recCentre.z));
   }
 
+  // zoltar by the front wall, between the concession and the kiosk
+  const zoltar = createZoltar(sceneManager.scene,
+    new THREE.Vector3(11.5, 0, dims.depth / 2 - 0.75), Math.PI);
+
   // ---- tv room through the doorway ----
   let tvShelves = null;
   let tvRoom = null;
@@ -331,6 +336,10 @@ async function main() {
       new THREE.Vector3(scanner.group.position.x - 0.25, 0, scanner.group.position.z - 0.25),
       new THREE.Vector3(scanner.group.position.x + 0.25, 1.2, scanner.group.position.z + 0.25),
     )] : []),
+    new THREE.Box3(
+      new THREE.Vector3(zoltar.group.position.x - 0.55, 0, zoltar.group.position.z - 0.45),
+      new THREE.Vector3(zoltar.group.position.x + 0.55, 2.2, zoltar.group.position.z + 0.45),
+    ),
     ...(tvShelves ? tvShelves.getCollisionBoxes() : []),
     ...(tvRoom ? tvRoom.collisionBoxes : []),
     ...(backShelves ? backShelves.getCollisionBoxes() : []),
@@ -380,6 +389,20 @@ async function main() {
     }
   });
 
+  // zoltar dispenses a movie fortune: the ball stirs, he deliberates,
+  // and a film's card opens as your fate. good unwatched films first
+  store.on('zoltar-speak', () => {
+    const pool = shopItems.filter(i => i.viewCount === 0 && (i.rating ?? 0) >= 6.5);
+    const fallback = pool.length > 0 ? pool : shopItems;
+    if (fallback.length === 0) return;
+    const started = zoltar.speak(() => {
+      const pick = fallback[Math.floor(Math.random() * fallback.length)];
+      hud.showMessage(`zoltar has spoken: ${pick.title}`, 5000);
+      store.selectItem(pick.ratingKey);
+    });
+    if (started) hud.showMessage('the ball stirs...', 2200);
+  });
+
   // ambient store audio — starts on the first pointer lock gesture
   const audio = createStoreAudio();
   store.on('audio-muted', (m) => hud.showMessage(m ? 'audio muted' : 'audio on', 2000));
@@ -404,6 +427,7 @@ async function main() {
   raycaster.setTargets(
     [
       { mesh: kiosk.mesh, item: { isKiosk: true } },
+      { mesh: zoltar.buttonMesh, item: { isZoltar: true } },
       ...(scanner ? [{ mesh: scanner.buttonMesh, item: { isScanButton: true } }] : []),
     ],
     [
@@ -492,6 +516,9 @@ async function main() {
 
     // taste scanner button pulse and laser sweep
     if (scanner) scanner.update(dt);
+
+    // zoltar's idle shimmer and fortune performance
+    zoltar.update(dt);
 
     // footsteps while moving
     const moving = store.isPointerLocked

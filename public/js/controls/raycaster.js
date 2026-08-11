@@ -174,6 +174,10 @@ export class CaseRaycaster {
       store.emit('taste-scan');
       return;
     }
+    if (item?.isZoltar) {
+      store.emit('zoltar-speak');
+      return;
+    }
     if (item && item.ratingKey) {
       store.selectItem(item.ratingKey);
     }
