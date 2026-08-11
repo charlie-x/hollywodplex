@@ -1,9 +1,7 @@
 /*
- * mist.js — the mist event. every so often a thick fog rolls across
- * the car park outside the storefront glass, dark shapes drift past,
- * cracks slam into the windows as something tests them — and then it
- * all recedes and the night is ordinary again. an homage to the 2007
- * frank darabont film. visible only through the front windows.
+ * weather.js — occasional night-time weather for the car park beyond
+ * the storefront glass, on a slow timer. conditions vary. visible
+ * only through the front windows, and best left undescribed.
  */
 
 import * as THREE from 'three';
@@ -16,7 +14,7 @@ const ROLL_IN = 15;
 const ROLL_OUT = 20;
 const MAX_CRACKS = 4;
 
-export function createMistEvent(scene, dims) {
+export function createWeatherEvent(scene, dims) {
   const cx = dims.cx ?? 0;
   const wallZ = (dims.cz ?? 0) + dims.depth / 2;
 
@@ -195,7 +193,7 @@ export function createMistEvent(scene, dims) {
         timer -= dt;
         fogLevel = Math.max(0, timer / ROLL_OUT);
         applyFog();
-        // the cracks mend as the mist lets go of the glass
+        // the cracks mend as the weather lets go of the glass
         for (const c of cracks) {
           if (c.age >= 0) {
             c.mesh.material.opacity = Math.min(c.mesh.material.opacity, fogLevel);
