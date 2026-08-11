@@ -108,7 +108,7 @@ export function createStorefront(scene, dims) {
     new THREE.Vector3(cx + half, GLASS_TOP, wallZ + 0.15),
   )];
 
-  return { group, collisionBoxes, update, cars: outside.cars };
+  return { group, collisionBoxes, update, cars: outside.cars, lamp: outside.lamp };
 }
 
 /*
@@ -173,6 +173,7 @@ function buildCarPark(group, cx, wallZ) {
   lamp.add(pool);
   lamp.position.set(cx + 7.6, 0, wallZ + 3.4);
   group.add(lamp);
+  const lampParts = { pool, headMat: head.material };
 
   // strip of shops across the car park, windows lit
   const strip = new THREE.Mesh(
@@ -213,7 +214,7 @@ function buildCarPark(group, cx, wallZ) {
   ring.position.set(cx - 5.8, 5.55, wallZ + 15.5);
   group.add(ring);
 
-  return { brokenB: brandys.brokenMat, cars };
+  return { brokenB: brandys.brokenMat, cars, lamp: lampParts };
 }
 
 /*

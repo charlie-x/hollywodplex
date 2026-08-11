@@ -27,6 +27,7 @@ export function softFogTexture() {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping; // the banks drift sideways
   return texture;
 }
 
@@ -228,7 +229,7 @@ export function gunkTrailTexture() {
  * vertices are rebuilt each frame, with organic radius undulation and
  * a draw range so it can grow out of the fog and retract again.
  */
-export function makeTentacle(segments = 30, radial = 8, r0 = 0.34, r1 = 0.045) {
+export function makeTentacle(segments = 42, radial = 10, r0 = 0.34, r1 = 0.06) {
   const rings = segments + 1;
   const positions = new Float32Array(rings * radial * 3);
   const normals = new Float32Array(rings * radial * 3);
@@ -279,7 +280,9 @@ export function makeTentacle(segments = 30, radial = 8, r0 = 0.34, r1 = 0.045) {
       if (normal.lengthSq() < 1e-4) normal.set(1, 0, 0);
       normal.normalize();
       binormal.crossVectors(tangent, normal).normalize();
-      const radius = (r0 + (r1 - r0) * t) * (1 + 0.14 * Math.sin(t * 22 + wobble));
+      // a gentle low-frequency muscle swell — anything stronger reads
+      // as beads on a string once the thin sections fade into the fog
+      const radius = (r0 + (r1 - r0) * t) * (1 + 0.05 * Math.sin(t * 9 + wobble));
       for (let r = 0; r < radial; r++) {
         const a = (r / radial) * Math.PI * 2;
         const i = (s * radial + r) * 3;

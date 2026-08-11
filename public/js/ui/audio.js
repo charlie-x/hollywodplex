@@ -114,6 +114,44 @@ export function createStoreAudio() {
     osc.stop(ctx.currentTime + 0.12);
   }
 
+  /*
+   * a deep thump with a glass rattle — something heavy against a window.
+   */
+  function thud() {
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(70, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.18);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.4, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    osc.connect(g);
+    g.connect(master);
+    osc.start(t);
+    osc.stop(t + 0.4);
+
+    const dur = 0.12;
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2400;
+    bp.Q.value = 2;
+    const g2 = ctx.createGain();
+    g2.gain.value = 0.07;
+    src.connect(bp);
+    bp.connect(g2);
+    g2.connect(master);
+    src.start(t);
+  }
+
   function toggleMute() {
     muted = !muted;
     if (master) master.gain.value = muted ? 0 : 1;
@@ -146,5 +184,5 @@ export function createStoreAudio() {
     }
   });
 
-  return { startMuzak, update, toggleMute, footstep, click };
+  return { startMuzak, update, toggleMute, footstep, click, thud };
 }

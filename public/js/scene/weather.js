@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import store from '../store.js';
 import { STOREFRONT_WIDTH } from './storefront.js';
 import {
   softFogTexture, creatureTextures, splatTextures, crackTextures,
@@ -22,22 +23,32 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   const cx = dims.cx ?? 0;
   const wallZ = (dims.cz ?? 0) + dims.depth / 2;
   const cars = opts.cars || [];
+  const eye = opts.eye || null; // live camera position for billboarding
+  const lamp = opts.lamp || null;
+  const lampBase = lamp
+    ? { pool: lamp.pool.intensity, head: lamp.headMat.emissiveIntensity }
+    : null;
+  let lampLevel = 1;
+  let lampTarget = 1;
 
   // ---- layered fog banks across the car park ----
   // far banks thicken first so the fog reads as rolling towards the
   // glass rather than fading in evenly
   const banks = [];
-  const fogTexture = softFogTexture();
-  for (const [dz, maxOpacity, delay] of [
-    [14.6, 0.95, 0.0],
-    [9.0, 0.8, 0.25],
-    [5.0, 0.65, 0.5],
-    [1.6, 0.5, 0.75],
+  const baseFog = softFogTexture();
+  let airT = 0; // shared clock for drift and breathing
+  for (const [dz, maxOpacity, delay, drift] of [
+    [14.6, 0.95, 0.0, 0.004],
+    [9.0, 0.8, 0.25, 0.008],
+    [5.0, 0.65, 0.5, -0.011],
+    [1.6, 0.5, 0.75, 0.016],
   ]) {
+    const tex = baseFog.clone();
+    tex.needsUpdate = true;
     const bank = new THREE.Mesh(
       new THREE.PlaneGeometry(STOREFRONT_WIDTH + 22, 7),
       new THREE.MeshBasicMaterial({
-        map: fogTexture, color: '#c4c6ca', transparent: true, opacity: 0,
+        map: tex, color: '#c4c6ca', transparent: true, opacity: 0,
         depthWrite: false,
       }),
     );
@@ -45,7 +56,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     bank.rotation.y = Math.PI;
     bank.visible = false;
     scene.add(bank);
-    banks.push({ mesh: bank, maxOpacity, delay });
+    banks.push({ mesh: bank, maxOpacity, delay, drift, phase: dz });
   }
 
   // ---- the things in the fog: varied silhouettes drifting past ----
@@ -60,17 +71,25 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   shape.rotation.y = Math.PI;
   shape.visible = false;
   scene.add(shape);
-  let pass = null; // one crossing: direction, depth, size, speed all vary
+  let pass = null;
 
-  function startPass() {
+  // a shape resolves out of the dense fog, looms towards the glass,
+  // and withdraws — depth does the work, not a left-right track
+  function startPass(overrides = {}) {
     pass = {
       t: 0,
-      dur: 4.5 + Math.random() * 5,
-      dir: Math.random() < 0.5 ? 1 : -1,
-      z: 2.5 + Math.random() * 5.5,
-      y: 1.2 + Math.random() * 1.5,
-      scale: 0.7 + Math.random() * 1.1,
+      dur: 9 + Math.random() * 7,
+      x0: (Math.random() - 0.5) * (STOREFRONT_WIDTH - 2),
+      xDrift: (Math.random() - 0.5) * 3,
+      zFar: 10.5 + Math.random() * 2.5,
+      zNear: 2.2 + Math.random() * 1.6,
+      y: 1.2 + Math.random() * 1.4,
+      scale: 0.9 + Math.random() * 1.1,
       flip: Math.random() < 0.5,
+      charge: false,
+      hitX: null,
+      thumped: false,
+      ...overrides,
     };
     shape.material.map = shapeTexs[Math.floor(Math.random() * shapeTexs.length)];
     shape.material.needsUpdate = true;
@@ -79,17 +98,29 @@ export function createWeatherEvent(scene, dims, opts = {}) {
 
   function updatePass(dt) {
     pass.t += dt;
-    const f = pass.t / pass.dur;
-    const span = STOREFRONT_WIDTH + 8;
+    const f = Math.min(1, pass.t / pass.dur);
+    // slow out of the murk, a dwell at the closest point, then back
+    const approach = Math.pow(Math.sin(f * Math.PI), 1.4);
+    const z = pass.zFar - (pass.zFar - pass.zNear) * approach;
     shape.position.set(
-      cx + pass.dir * (f - 0.5) * span,
-      pass.y + 0.18 * Math.sin(pass.t * 1.7),
-      wallZ + pass.z,
+      cx + pass.x0 + pass.xDrift * f,
+      pass.y + 0.15 * Math.sin(pass.t * 1.1),
+      wallZ + z,
     );
-    shape.scale.set(pass.scale * (pass.flip ? -1 : 1), pass.scale, 1);
-    // deeper shapes read dimmer through more fog
-    const peak = Math.max(0.2, 0.55 - (pass.z - 2.5) * 0.045);
-    shape.material.opacity = peak * Math.sin(Math.min(1, f) * Math.PI);
+    // always face the viewer so it never reads as a flat cutout
+    // seen edge-on, and breathe slightly like something alive
+    if (eye) shape.lookAt(eye.x, shape.position.y, eye.z);
+    shape.rotation.z = 0.06 * Math.sin(pass.t * 0.9);
+    const s = pass.scale * (1 + 0.05 * Math.sin(pass.t * 2.1));
+    shape.scale.set(s * (pass.flip ? -1 : 1), s, 1);
+    // solidity comes entirely from how close it dares to come
+    shape.material.opacity = Math.max(0, 0.62 - (z - 2.0) * 0.055);
+
+    // a charge slams the glass at the moment of closest approach
+    if (pass.charge && !pass.thumped && f >= 0.5) {
+      pass.thumped = true;
+      thumpImpact(pass.hitX);
+    }
     if (f >= 1) {
       pass = null;
       shape.visible = false;
@@ -136,7 +167,27 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     });
   }
 
-  function thump() {
+  // a strike prefers to show its cause: if nothing is out there, a
+  // charging shape comes first and the impact lands at its closest
+  // approach. if something is already prowling, the hit just happens
+  function scheduleStrike() {
+    if (!pass) {
+      const hitX = cx + (Math.random() - 0.5) * (STOREFRONT_WIDTH - 1.6);
+      startPass({
+        charge: true,
+        hitX,
+        x0: hitX - cx,
+        xDrift: (Math.random() - 0.5) * 0.6,
+        dur: 4.5 + Math.random() * 2,
+        zNear: 1.5,
+      });
+    } else {
+      thumpImpact(null);
+    }
+  }
+
+  function thumpImpact(hitX) {
+    store.emit('glass-thump');
     const free = cracks.find(c => c.age < 0);
     if (!free) return;
     free.age = 0;
@@ -144,9 +195,11 @@ export function createWeatherEvent(scene, dims, opts = {}) {
     free.mesh.material.map = crackTexs[Math.floor(Math.random() * crackTexs.length)];
     free.mesh.material.needsUpdate = true;
     free.mesh.visible = true;
-    const hx = cx + (Math.random() - 0.5) * (STOREFRONT_WIDTH - 1.6);
+    const hx = hitX ?? (cx + (Math.random() - 0.5) * (STOREFRONT_WIDTH - 1.6));
     const hy = 0.9 + Math.random() * 1.6;
-    free.mesh.position.set(hx, hy, wallZ - 0.03);
+    // impacts land on the outside face of the glass — that is where
+    // the things are
+    free.mesh.position.set(hx, hy, wallZ + 0.012);
     free.mesh.rotation.z = Math.random() * Math.PI * 2;
     // most impacts leave the bug that made them smeared on the glass,
     // and gravity gets them all eventually
@@ -163,7 +216,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       free.splat.position.set(
         hx + (Math.random() - 0.5) * 0.12,
         free.startY,
-        wallZ - 0.025,
+        wallZ + 0.02,
       );
       free.splat.rotation.z = Math.random() * Math.PI * 2;
     }
@@ -249,7 +302,13 @@ export function createWeatherEvent(scene, dims, opts = {}) {
       car.rotation.x = 0.16 * Math.sin(Math.min(1, q * 2) * Math.PI / 2);
       car.rotation.z = 0.05 * Math.sin(g.t * 25) * (1 - q);
       car.updateMatrix();
-      tip.set(car.position.x, roofY + 0.05, car.position.z);
+      // the tip wraps over the roof and down the far side for grip
+      const wrap = Math.min(1, q * 4);
+      tip.set(
+        car.position.x,
+        roofY + 0.05 - (roofY - 0.5) * wrap,
+        car.position.z + 0.45 * wrap,
+      );
       layTentacle(1);
       if (q >= 1) {
         g.phase = 'vanish';
@@ -297,18 +356,43 @@ export function createWeatherEvent(scene, dims, opts = {}) {
   function applyFog() {
     for (const b of banks) {
       const local = Math.max(0, Math.min(1, (fogLevel - b.delay) / (1 - b.delay)));
-      b.mesh.material.opacity = b.maxOpacity * local;
+      // gentle breathing so the wall of fog never sits perfectly still
+      b.mesh.material.opacity = b.maxOpacity * local
+        * (0.92 + 0.08 * Math.sin(airT * 0.35 + b.phase));
     }
   }
 
   function update(dt) {
+    airT += dt;
+    // the banks drift sideways at different speeds for parallax
+    if (state !== 'idle') {
+      for (const b of banks) b.mesh.material.map.offset.x += b.drift * dt;
+    }
+
+    // the street lamp struggles while the weather is in
+    if (lamp && lampBase) {
+      if (state === 'siege' && Math.random() < dt * 3) {
+        lampTarget = 0.15 + Math.random() * 0.85;
+      } else if (state !== 'siege') {
+        lampTarget = 1;
+      }
+      lampLevel += (lampTarget - lampLevel) * Math.min(1, dt * 12);
+      lamp.pool.intensity = lampBase.pool * lampLevel;
+      lamp.headMat.emissiveIntensity = lampBase.head * lampLevel;
+    }
+
     // cracks pop in fast, then linger; the splat lands with them and
     // then slowly loses its grip, sliding down and smearing a trail
     for (const c of cracks) {
       if (c.age < 0) continue;
       c.age += dt;
       const pop = Math.min(1, c.age / 0.12);
-      c.mesh.scale.setScalar(c.size * (0.3 + 0.7 * pop));
+      // overshoot and settle, so the hit lands with a snap
+      let s = c.size * (0.3 + 0.7 * pop);
+      if (c.age > 0.12) {
+        s = c.size * (1 + 0.16 * Math.exp(-(c.age - 0.12) * 9) * Math.cos((c.age - 0.12) * 34));
+      }
+      c.mesh.scale.setScalar(s);
       c.mesh.material.opacity = 0.85 * pop * Math.min(1, fogLevel * 2);
       if (c.hasSplat) {
         c.splat.scale.setScalar(c.splatSize * (0.4 + 0.6 * pop));
@@ -320,7 +404,7 @@ export function createWeatherEvent(scene, dims, opts = {}) {
           c.splat.rotation.z += dt * 0.06; // lazily turning as it slips
           if (c.slideY > 0.04) {
             c.trail.visible = true;
-            c.trail.position.set(c.splat.position.x, c.startY - c.slideY / 2, wallZ - 0.02);
+            c.trail.position.set(c.splat.position.x, c.startY - c.slideY / 2, wallZ + 0.028);
             c.trail.scale.set(c.splatSize * 0.55, c.slideY + 0.08, 1);
             c.trail.material.opacity = 0.6 * Math.min(1, fogLevel * 2);
           }
@@ -350,8 +434,9 @@ export function createWeatherEvent(scene, dims, opts = {}) {
         siegeLeft -= dt;
         siegeT += dt;
         thumpIn -= dt;
+        applyFog(); // keeps the breathing going at full thickness
         if (thumpIn <= 0) {
-          thump();
+          scheduleStrike();
           thumpIn = 8 + Math.random() * 10;
         }
         if (grabPlanned && !grab && siegeT >= grabAt) beginGrab();

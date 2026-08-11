@@ -328,7 +328,11 @@ async function main() {
   const dust = createDustParticles(sceneManager.scene, movieRoom.dimensions);
 
   // the car park has its own weather. sometimes.
-  const weather = createWeatherEvent(sceneManager.scene, dims, { cars: storefront.cars });
+  const weather = createWeatherEvent(sceneManager.scene, dims, {
+    cars: storefront.cars,
+    lamp: storefront.lamp,
+    eye: sceneManager.camera.position,
+  });
 
   // n hurries the next weather along, for the impatient
   document.addEventListener('keydown', (e) => {
@@ -422,6 +426,8 @@ async function main() {
   // ambient store audio — starts on the first pointer lock gesture
   const audio = createStoreAudio();
   store.on('audio-muted', (m) => hud.showMessage(m ? 'audio muted' : 'audio on', 2000));
+  // something heavy against the front glass
+  store.on('glass-thump', () => audio.thud());
 
   // pointer lock
   const pointerLock = setupPointerLock(canvas,
