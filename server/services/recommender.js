@@ -50,7 +50,7 @@ async function fetchCatalogue(sectionId) {
 
 function compactLine(item) {
   const genres = item.genres.join(',');
-  return `${item.ratingKey}|${item.title} (${item.year ?? '?'}) [${genres}] ${item.rating ?? ''}`;
+  return `${item.promptId}|${item.title} (${item.year ?? '?'}) [${genres}] ${item.rating ?? ''}`;
 }
 
 const pickSchema = {
@@ -137,13 +137,25 @@ async function generate(sectionId) {
     return empty;
   }
 
+  // ids go into the prompt once per film and come back once per pick.
+  // plex ratingKeys are small integers and ride along cheaply, but
+  // jellyfin ids are 32-char guids (~13 tokens each), so long ids are
+  // swapped for 1-based indices in the prompt and translated back
+  // afterwards — a big cut in tokens for the same request.
+  const remap = catalogue.some(i => String(i.ratingKey).length > 12);
+  catalogue.forEach((item, idx) => {
+    item.promptId = remap ? String(idx + 1) : String(item.ratingKey);
+  });
+  const realId = new Map(catalogue.map(i => [i.promptId, String(i.ratingKey)]));
+
   const picks = await askClaude(watched, catalogue);
 
-  // resolve picks back to catalogue entries, dropping any invented keys
+  // translate prompt ids back and resolve picks to catalogue entries,
+  // dropping any invented keys
   const byKey = new Map(catalogue.map(i => [String(i.ratingKey), i]));
   const clean = (list) => (list || [])
-    .filter(p => byKey.has(String(p.ratingKey)))
-    .map(p => ({ ratingKey: String(p.ratingKey), reason: p.reason }));
+    .map(p => ({ ratingKey: realId.get(String(p.ratingKey)), reason: p.reason }))
+    .filter(p => p.ratingKey && byKey.has(p.ratingKey));
 
   const shelves = [
     {

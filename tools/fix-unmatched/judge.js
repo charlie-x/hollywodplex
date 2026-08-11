@@ -17,7 +17,7 @@ const maxBatches = parseInt(process.argv[2], 10) || 10;
 const state = loadState();
 const pending = state.items.filter(i => i.candidates && i.verdict === undefined);
 if (!llmAvailable()) {
-  console.error('no llm configured: set ANTHROPIC_API_KEY or OLLAMA_URL in .env');
+  console.error('no llm configured: set ANTHROPIC_API_KEY, OLLAMA_URL or OPENAI_BASE_URL in .env');
   process.exit(1);
 }
 console.log(`judging with ${llmDescription()}`);
