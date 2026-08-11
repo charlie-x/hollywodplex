@@ -99,8 +99,8 @@ export function createHUD() {
       return;
     }
     if (item.isScanButton) {
-      hoverTitle.textContent = 'taste scanner';
-      hoverMeta.textContent = 'press for a fresh batch of recommendations';
+      hoverTitle.textContent = 'voight-rewind machine';
+      hoverMeta.textContent = 'a taste empathy test — press for fresh recommendations';
       hoverCard.style.display = 'flex';
       return;
     }

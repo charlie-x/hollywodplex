@@ -349,9 +349,9 @@ async function main() {
   store.on('taste-scan', async () => {
     if (!scanner || rescanInFlight) return;
     rescanInFlight = true;
-    hud.showMessage('taste scan initiated — hold still', 2800);
+    hud.showMessage('voight-rewind test initiated — hold still and think about movies', 2800);
     scanner.playScan(controls.getPosition(), () => {
-      hud.showMessage('profile captured — the film buff is thinking...', 5000);
+      hud.showMessage('interlinked. profile captured — the film buff is deliberating...', 5000);
     });
     try {
       const before = (await fetchRecommendations()).generatedAt;
@@ -367,14 +367,14 @@ async function main() {
             .map(r => ({ ...store.items.get(String(r.ratingKey)), reason: r.reason }));
           if (picks.length > 0) {
             const changed = shelves.restockSection('Recommended For You', picks);
-            hud.showMessage(`fresh picks are on the recommended rack (${changed} swapped)`, 6000);
+            hud.showMessage(`test complete: you're a renter. ${changed} fresh picks on the recommended rack`, 6000);
           }
           break;
         }
       }
     } catch (err) {
       console.warn('[app] taste scan failed:', err.message);
-      hud.showMessage('the scanner jammed — try again later', 4000);
+      hud.showMessage('the voight-rewind machine jammed — try again later', 4000);
     } finally {
       rescanInFlight = false;
     }

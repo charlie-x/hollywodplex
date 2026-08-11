@@ -1,8 +1,9 @@
 /*
- * scan-button.js — the taste scanner beside the recommended rack: a
- * pedestal with a pulsing red button. pressing it sweeps a sci-fi
- * laser ring over the customer, and fresh recommendations follow once
- * the resident film buff has chewed on the scan.
+ * scan-button.js — the voight-rewind machine beside the recommended
+ * rack: a taste empathy test for the be-kind-rewind era. a pedestal
+ * with a pulsing red button sweeps a laser ring over the customer,
+ * and fresh recommendations follow once the resident film buff has
+ * chewed on the scan.
  */
 
 import * as THREE from 'three';
@@ -129,13 +130,14 @@ function labelTexture() {
   ctx.lineWidth = 4;
   ctx.strokeRect(6, 6, 244, 138);
   ctx.fillStyle = '#f2f0ea';
-  ctx.font = 'bold 40px Arial, sans-serif';
+  ctx.font = 'bold 34px Arial, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('TASTE', 128, 58);
-  ctx.fillText('SCANNER', 128, 104);
+  ctx.fillText('VOIGHT', 128, 52);
+  ctx.fillText('REWIND', 128, 94);
   ctx.fillStyle = '#ff2233';
-  ctx.font = 'bold 17px Arial, sans-serif';
-  ctx.fillText('press for new picks', 128, 134);
+  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.fillText('taste empathy test', 128, 120);
+  ctx.fillText('press to begin', 128, 140);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
