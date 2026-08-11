@@ -183,6 +183,11 @@ instead. the image and stream proxies only accept server-relative
 paths, so the plex token or jellyfin api key cannot be redirected to
 other hosts and never reaches the browser.
 
+## credits
+
+jellyfin support was contributed by
+[icelaglace](https://github.com/icelaglace).
+
 
 
 <img width="1649" height="963" alt="image" src="https://github.com/user-attachments/assets/d509994d-90e6-40ae-ab3a-8f729c7ce9df" />
